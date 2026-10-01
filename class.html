@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Class sign-up</title>
+<script src="config.js"></script>
+<style>
+  :root {
+    --navy: #16294A; --gold: #C8A64B; --ink: #13213A; --muted: #5E6A7D; --line: #D5DCE7;
+    --bg: #F2F4F8; --card: #FFFFFF; --ok: #1E7A4C; --okbg: #E5F3EB; --err: #B3261E; --errbg: #FBEAE9;
+    --wait: #7A5200; --waitbg: #FFF4D6; --focus: #2F5DA8;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+  button, input { font: inherit; color: inherit; }
+  .top { background: var(--navy); color: #fff; border-bottom: 3px solid var(--gold); padding: calc(14px + env(safe-area-inset-top)) 16px 14px; }
+  .top-in { max-width: 560px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+  .top img { width: 44px; height: 44px; object-fit: contain; flex: none; }
+  .top b { display: block; font-size: 17px; }
+  .top span { font-size: 13px; opacity: .8; letter-spacing: .5px; text-transform: uppercase; }
+  main { max-width: 560px; margin: 0 auto; padding: 16px 16px calc(120px + env(safe-area-inset-bottom)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 0 0 14px; }
+  .title { margin: 0; font-size: 22px; line-height: 1.25; color: var(--navy); }
+  .meta { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
+  .notes { margin: 10px 0 0; font-size: 15px; white-space: pre-wrap; }
+  .cat { display: inline-block; margin-top: 8px; padding: 2px 8px; border-radius: 6px; background: #E6EBF3; color: var(--navy); font-size: 13px; font-weight: 600; }
+  h2 { margin: 0 0 10px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  h2 i { font-style: normal; color: var(--navy); }
+  .note { color: var(--muted); font-size: 15px; }
+  .banner { margin: 0 0 14px; padding: 12px 14px; border-radius: 12px; font-size: 15px; font-weight: 600; }
+  .banner.closed { background: var(--errbg); color: var(--err); }
+  .banner.mine { background: var(--okbg); color: var(--ok); }
+  .banner.none { background: var(--waitbg); color: var(--wait); }
+  .stop { text-align: center; padding: 30px 18px; }
+  .stop h1 { margin: 0 0 8px; font-size: 21px; color: var(--navy); }
+
+  .find { position: relative; }
+  input[type=text] {
+    width: 100%; min-height: 50px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; font-size: 17px;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px rgba(47, 93, 168, .18); }
+  .drop {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5; margin: 0; padding: 4px; list-style: none;
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 28px rgba(19, 33, 58, .16);
+  }
+  .drop[hidden] { display: none; }
+  .drop button {
+    display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; min-height: 50px;
+    padding: 6px 12px; border: 0; border-radius: 9px; background: none; text-align: left; cursor: pointer;
+  }
+  .drop button:hover, .drop button:focus { background: #EEF2F8; outline: none; }
+  .drop small { color: var(--muted); font-size: 14px; white-space: nowrap; }
+  .drop .none { padding: 12px; color: var(--muted); font-size: 15px; }
+  .picked { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 8px 8px 14px; border: 1.5px solid var(--navy); border-radius: 12px; background: #F4F7FC; }
+  .picked div { flex: 1; min-width: 0; }
+  .picked b { display: block; }
+  .picked small { color: var(--muted); font-size: 14px; }
+  .link { border: 0; background: none; color: var(--focus); font-weight: 600; padding: 10px 2px; cursor: pointer; font-size: 15px; }
+
+  /* One card per date */
+  .date { padding: 0; overflow: hidden; }
+  .date.me { border: 2px solid var(--ok); }
+  .date.mewait { border: 2px solid #E8C96A; }
+  .dhead { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px 10px; }
+  .dhead div { flex: 1; min-width: 0; }
+  .dhead b { display: block; font-size: 18px; color: var(--navy); }
+  .dhead small { display: block; color: var(--muted); font-size: 14px; }
+  .seats { flex: none; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; background: var(--okbg); color: var(--ok); }
+  .seats.full { background: var(--errbg); color: var(--err); }
+  .seats.past { background: #E9ECF1; color: var(--muted); }
+  .bar { height: 6px; margin: 0 16px 10px; border-radius: 3px; background: #E9ECF1; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--navy); }
+  .who { margin: 0; padding: 0 16px 8px; list-style: none; }
+  .who li { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 15px; border-top: 1px solid #EEF1F5; }
+  .who li:first-child { border-top: 0; }
+  .who li.you { font-weight: 700; }
+  .cs { flex: none; min-width: 42px; padding: 1px 6px; border-radius: 6px; background: var(--navy); color: #fff; font-size: 12px; font-weight: 700; text-align: center; }
+  .who .w .cs { background: #C9A443; }
+  .open { color: var(--muted); font-size: 14px; padding: 4px 0 8px; border: 0; }
+  .wl { margin: 4px 16px 0; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--wait); font-weight: 700; }
+  .acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 16px 16px; }
+  .btn {
+    min-height: 50px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--navy); color: #fff;
+    font-size: 17px; font-weight: 700; cursor: pointer; flex: 1 1 auto;
+  }
+  .btn.ghost { background: #fff; color: var(--navy); border: 1.5px solid var(--navy); }
+  .btn.warn { background: var(--err); }
+  .btn:disabled { opacity: .55; }
+  .state { flex: 1 1 100%; font-weight: 700; font-size: 15px; }
+  .state.ok { color: var(--ok); }
+  .state.wait { color: var(--wait); }
+  .drop-link { border: 0; background: none; color: var(--err); font-weight: 600; font-size: 15px; padding: 10px 2px; cursor: pointer; }
+  .foot { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+  .topic { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 18px 2px 10px; font-size: 19px; color: var(--navy); }
+  .topic span { font-size: 13px; padding: 3px 10px; border-radius: 999px; }
+  .topic span.ok { background: var(--okbg); color: var(--ok); }
+  .topic span.need { background: var(--waitbg); color: var(--wait); }
+  .pinov { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; justify-content: center; background: rgba(19, 33, 58, .5); padding: 12px; }
+  .pinov[hidden] { display: none; }
+  .pincard { width: 100%; max-width: 480px; background: #fff; border-radius: 16px; padding: 18px 16px calc(16px + env(safe-area-inset-bottom)); max-height: 92vh; overflow: auto; }
+  @media (min-height: 600px) { .pinov { align-items: center; } }
+  .pint { margin: 0 0 6px; font-size: 20px; letter-spacing: 0; text-transform: none; color: var(--navy); }
+  .pinf { display: block; margin: 12px 0 0; }
+  .pinf span { display: block; font-size: 14px; font-weight: 700; margin: 0 0 4px; }
+  .pinf input { width: 100%; min-height: 50px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 12px; font-size: 20px; }
+  .pinf input[type=password] { letter-spacing: 8px; font-weight: 700; }
+  .pin-err { color: var(--err); font-weight: 600; min-height: 1.3em; margin: 10px 0 0; font-size: 15px; }
+  .pinbtns { display: flex; gap: 10px; margin-top: 12px; }
+  .saving { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 12px; z-index: 25; padding: 5px 12px; border-radius: 999px;
+    background: #fff; color: var(--navy); font-size: 13px; font-weight: 700; box-shadow: 0 4px 14px rgba(19, 33, 58, .2); }
+  .saving.retry { color: var(--err); }
+  .saving.done { color: var(--ok); }
+  .saving[hidden] { display: none; }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 20;
+    max-width: calc(100% - 32px); padding: 12px 16px; border-radius: 12px; background: var(--ink); color: #fff; font-size: 15px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+  }
+  .toast.bad { background: var(--err); }
+  .toast[hidden] { display: none; }
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <img id="patch" alt="" hidden>
+  <div><span>Class sign-up</span><b id="dept"></b></div>
+</div></header>
+<main id="app"><p style="text-align:center;color:#5E6A7D;padding:40px 0">Loading…</p></main>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+// This page lives on GitHub. Google won't show pages from the check-in
+// project, so this page asks the project for its data instead
+// (APP_URL is in config.js).
+var DATA = null;
+var FN = { ciSubmit: 'checkinSubmit', ciClassSignup: 'classSignup', ciClassState: 'classState' };
+function api(name, arg) {
+  return fetch(APP_URL, { method: 'POST', body: JSON.stringify({ pub: name, arg: arg }) })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+}
+function runner(ok, fail) {
+  var r = {
+    withSuccessHandler: function (f) { return runner(f, fail); },
+    withFailureHandler: function (f) { return runner(ok, f); }
+  };
+  Object.keys(FN).forEach(function (k) {
+    r[k] = function (arg) {
+      api(FN[k], arg).then(function (res) { if (ok) ok(res); }, function (e) { if (fail) fail(e); });
+    };
+  });
+  return r;
+}
+var google = { script: { run: runner(null, null) } };
+
+function start() {
+(function () {
+  var app = document.getElementById('app');
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  };
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+
+  $('dept').textContent = DATA.dept || '';
+  if (DATA.patch) { var img = $('patch'); img.src = DATA.patch; img.hidden = false; img.onerror = function () { img.hidden = true; }; }
+  if (!DATA.ok) { stop('Class sign-up', DATA.message); return; }
+
+  // The same phone id the check-in page uses. Sign-ups made on this
+  // phone can only be changed on this phone.
+  var device = store.get('ci-device');
+  if (!device) { device = String(Date.now()) + Math.random().toString(36).slice(2, 10); store.set('ci-device', device); }
+  var meKey = 'ci-class-me-' + DATA.c;
+
+  var st = { cls: DATA.cls, today: DATA.today, me: null, matches: [], busy: '', confirm: '', confirmTimer: null };
+
+  var PEOPLE = (st.cls.people || []).map(function (p) {
+    var name = String(p[0] || ''), words = name.toLowerCase().split(/[\s.,'-]+/).filter(Boolean);
+    return { name: name, call: String(p[1] || ''), rank: String(p[2] || ''), words: words, last: words[words.length - 1] || '' };
+  }).sort(function (a, b) { return (a.last + a.name).localeCompare(b.last + b.name); });
+
+  // The name picked on this phone before is remembered.
+  try {
+    // Who picked on this phone: for this class, or the last class.
+    var saved = JSON.parse(store.get(meKey) || 'null') || JSON.parse(store.get('ci-class-me') || 'null');
+    if (saved) st.me = PEOPLE.filter(function (p) { return p.name === saved.name && p.call === saved.call; })[0] || null;
+  } catch (e) {}
+
+  render();
+
+  function stop(title, message) {
+    app.innerHTML = '<div class="card stop"><h1>' + esc(title) + '</h1><p class="note">' + esc(message) + '</p></div>';
+  }
+
+  function day(d) {
+    var m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return d || '';
+    return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(+m[1], +m[2] - 1, +m[3]).getDay()] + ', ' +
+      ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][+m[2] - 1] + ' ' + (+m[3]);
+  }
+  function shortDay(d) {
+    var m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return d || '';
+    return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(+m[1], +m[2] - 1, +m[3]).getDay()] + ' ' + (+m[2]) + '/' + (+m[3]);
+  }
+  function times(d) { return d.start ? d.start + (d.end ? '-' + d.end : '') : ''; }
+  function isMe(x) { return st.me && x.n === st.me.name && String(x.c || '') === st.me.call; }
+
+  function closedReason() {
+    var c = st.cls;
+    if (!c.open) return 'Sign-ups are closed. See the training officer to make a change.';
+    if (c.deadline && st.today > c.deadline) return 'The sign-up deadline has passed. See the training officer to make a change.';
+    return '';
+  }
+
+  // In-Service (category "In-Service"): one date per topic. g is the
+  // topic; other classes are one group ('').
+  function isIS() { return st.cls.kind === 'inservice'; }
+  function myStatus(g) {
+    var seat = null, wait = null;
+    st.cls.dates.forEach(function (d) {
+      if (isIS() && d.topic !== g) return;
+      d['in'].forEach(function (x) { if (isMe(x)) seat = d; });
+      d.wait.forEach(function (x, i) { if (isMe(x)) wait = { d: d, pos: i + 1 }; });
+    });
+    return { seat: seat, wait: wait };
+  }
+
+  function render() {
+    var c = st.cls;
+    var closed = closedReason();
+    var groups = isIS() ? (c.topics || []) : [''];
+    var mine = myStatus(groups[0]);
+    var html =
+      '<div class="card"><h1 class="title">' + esc(c.title) + '</h1>' +
+        (c.location ? '<p class="meta">' + esc(c.location) + '</p>' : '') +
+        (c.category ? '<span class="cat">' + esc(c.category) + '</span>' : '') +
+        (c.notes ? '<p class="notes">' + esc(c.notes) + '</p>' : '') +
+        (isIS() ? '<p class="meta">Pick one date for each topic: ' + esc(groups.join(', ')) + '. You can come back and finish later.</p>' : '') +
+        (c.deadline && !closed ? '<p class="meta"><b>Sign up by ' + esc(day(c.deadline)) + '.</b></p>' : '') +
+      '</div>';
+    if (closed) html += '<div class="banner closed">' + esc(closed) + '</div>';
+
+    html += '<div class="card"><h2><i>1</i> &nbsp;Who are you?</h2><div id="who"></div></div>';
+
+    if (st.me && isIS()) {
+      var left = groups.filter(function (g) { return !myStatus(g).seat; });
+      html += left.length
+        ? '<div class="banner ' + (left.length < groups.length ? 'mine' : 'none') + '">You have ' + (groups.length - left.length) + ' of ' + groups.length +
+            ' topics. Still need: ' + esc(left.join(', ')) + '.</div>'
+        : '<div class="banner mine">You have all ' + groups.length + ' topics. You\'re done!</div>';
+    } else if (st.me) {
+      if (mine.seat) {
+        html += '<div class="banner mine">You\'re signed up for ' + esc(shortDay(mine.seat.date) + (times(mine.seat) ? ' ' + times(mine.seat) : '')) + '.' +
+          (mine.wait ? ' You\'re also #' + mine.wait.pos + ' on the waitlist for ' + esc(shortDay(mine.wait.d.date)) + '.' : '') + '</div>';
+      } else if (mine.wait) {
+        html += '<div class="banner none">You\'re #' + mine.wait.pos + ' on the waitlist for ' + esc(shortDay(mine.wait.d.date)) +
+          '. You don\'t have a seat yet' + (closed ? '.' : ': you can also sign up for a date with open seats.') + '</div>';
+      } else if (!closed) {
+        html += '<div class="banner none">You haven\'t signed up yet. Pick a date below.</div>';
+      }
+    }
+
+    html += '<h2 style="margin:18px 2px 10px"><i>2</i> &nbsp;' + (st.me && !closed ? (isIS() ? 'Pick a date for each topic' : 'Pick a date') : 'Dates') + '</h2>';
+    // Days this officer already has, by topic (for "you're in X that day").
+    var busyDays = {};
+    if (isIS() && st.me) c.dates.forEach(function (d) { if (d['in'].some(isMe)) busyDays[d.date] = d.topic; });
+    groups.forEach(function (g) {
+      var m = myStatus(g);
+      if (isIS()) html += '<h3 class="topic">' + esc(g) + '<span class="' + (m.seat ? 'ok">' + esc(shortDay(m.seat.date)) : 'need">' + (st.me ? 'Not picked' : '')) + '</span></h3>';
+      // Dates already past aren't shown (unless this officer is on one).
+      var shown = c.dates.filter(function (d) { return (!isIS() || d.topic === g) && (d.date >= st.today || m.seat === d); });
+      html += shown.map(function (d) { return dateCard(d, m, closed, busyDays[d.date] && busyDays[d.date] !== g ? busyDays[d.date] : ''); }).join('') ||
+        '<p class="note">No upcoming dates.</p>';
+    });
+    html += '<div class="foot"><span>Updated ' + esc(clock(new Date())) + '</span><button type="button" class="link" id="refresh">Refresh</button></div>';
+    app.innerHTML = html;
+    drawWho();
+  }
+
+  function clock(d) { return ('0' + d.getHours()).slice(-2) + ('0' + d.getMinutes()).slice(-2); }
+
+  function dateCard(d, mine, closed, also) {
+    var taken = d['in'].length, left = d.seats - taken, past = d.date < st.today;
+    var seatHere = mine.seat === d, waitHere = mine.wait && mine.wait.d === d;
+    var chip = past ? '<span class="seats past">Past</span>'
+      : left <= 0 ? '<span class="seats full">Full' + (d.wait.length ? ' · ' + d.wait.length + ' waiting' : '') + '</span>'
+      : '<span class="seats">' + left + (left === 1 ? ' seat' : ' seats') + ' left</span>';
+    var html = '<div class="card date' + (seatHere ? ' me' : waitHere ? ' mewait' : '') + '">' +
+      '<div class="dhead"><div><b>' + esc(day(d.date)) + '</b><small>' + esc([times(d), d.location].filter(Boolean).join(' · ')) +
+        '</small><small>' + taken + ' of ' + d.seats + ' signed up</small>' +
+        (also && !seatHere ? '<small style="color:var(--wait);font-weight:700">You\'re in ' + esc(also) + ' that day.</small>' : '') + '</div>' + chip + '</div>' +
+      '<div class="bar"><i style="width:' + Math.min(100, Math.round(taken / d.seats * 100)) + '%"></i></div>';
+
+    html += '<ul class="who">' + (taken ? d['in'].map(function (x) {
+      return '<li' + (isMe(x) ? ' class="you"' : '') + '><span class="cs">' + esc(x.c || '·') + '</span>' + esc(x.n) + (isMe(x) ? ' (you)' : '') + '</li>';
+    }).join('') : '<li class="open">No one yet</li>') + '</ul>';
+    if (d.wait.length) {
+      html += '<p class="wl">Waitlist</p><ul class="who">' + d.wait.map(function (x, i) {
+        return '<li class="w' + (isMe(x) ? ' you' : '') + '"><span class="cs">' + (i + 1) + '</span>' + esc(x.n) + (x.c ? ' · ' + esc(x.c) : '') + (isMe(x) ? ' (you)' : '') + '</li>';
+      }).join('') + '</ul>';
+    }
+
+    // Buttons, for the person picked, while sign-ups are open.
+    if (st.me && !closed && !past) {
+      var busy = false;
+      var b = '';
+      var confirmKey = function (op) { return op + '|' + d.id; };
+      if (seatHere) {
+        b = '<span class="state ok">You\'re signed up for this date.</span>' +
+          (st.confirm === confirmKey('drop')
+            ? '<button type="button" class="btn warn" data-op="drop" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>Tap again to drop out</button>'
+            : '<button type="button" class="drop-link" data-op="drop" data-d="' + d.id + '">Drop out</button>');
+      } else if (waitHere) {
+        b = '<span class="state wait">You\'re #' + mine.wait.pos + ' on the waitlist. If a seat opens, you move in' + (mine.seat ? ' and give up ' + esc(shortDay(mine.seat.date)) : '') + '.</span>' +
+          '<button type="button" class="drop-link" data-op="unwait" data-d="' + d.id + '">Leave the waitlist</button>';
+      } else if (left > 0) {
+        var sw = !!mine.seat;
+        b = st.confirm === confirmKey('join') && sw
+          ? '<button type="button" class="btn" data-op="join" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>Tap again to switch from ' + esc(shortDay(mine.seat.date)) + '</button>'
+          : '<button type="button" class="btn" data-op="join" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>' +
+              (busy ? 'Saving…' : sw ? 'Switch to this date' : 'Sign up for this date') + '</button>';
+      } else {
+        b = '<button type="button" class="btn ghost" data-op="wait" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>' +
+          (busy ? 'Saving…' : 'Join the waitlist') + '</button>' +
+          (mine.seat ? '<span class="note" style="flex:1 1 100%">You keep ' + esc(shortDay(mine.seat.date)) + ' until a seat opens here.</span>' : '');
+      }
+      html += '<div class="acts">' + b + '</div>';
+    } else {
+      html += '<div style="height:8px"></div>';
+    }
+    return html + '</div>';
+  }
+
+  // ---------- Who are you ----------
+
+  function drawWho() {
+    var box = $('who');
+    if (!box) return;
+    if (st.me) {
+      var p = st.me;
+      box.innerHTML = '<div class="picked"><div><b>' + esc(p.name) + '</b><small>' + esc([p.rank, p.call].filter(Boolean).join(' · ')) + '</small></div>' +
+        '<button type="button" class="link" id="change">Not you?</button></div>' +
+        '<p class="note" style="margin:8px 2px 0">' + (myPass()
+          ? 'This phone remembers your PIN. <button type="button" class="link" id="forget" style="padding:0">Forget it</button>'
+          : hasPin() ? 'You\'ll enter your PIN to sign up or make changes.'
+          : 'The first time you sign up, you\'ll give your email and make up a PIN.') + '</p>';
+      return;
+    }
+    box.innerHTML = '<div class="find">' +
+        '<input type="text" id="q" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" ' +
+          'placeholder="Type your last name or call sign" aria-label="Your name" aria-autocomplete="list" aria-controls="drop">' +
+        '<ul class="drop" id="drop" role="listbox" hidden></ul></div>' +
+      '<p class="note" style="margin:8px 2px 0">Pick your name to sign up. Not in the list? See the training officer.</p>';
+  }
+
+  function search(q) {
+    var parts = q.toLowerCase().split(/[\s.,]+/).filter(Boolean);
+    if (!parts.length) return [];
+    return PEOPLE.filter(function (p) {
+      var call = p.call.toLowerCase();
+      return parts.every(function (w) {
+        return (call && call.indexOf(w) === 0) || p.words.some(function (x) { return x.indexOf(w) === 0; });
+      });
+    }).slice(0, 6);
+  }
+
+  function drawDrop() {
+    var drop = $('drop'), q = $('q').value.trim();
+    st.matches = search(q);
+    if (!q) { drop.hidden = true; drop.innerHTML = ''; return; }
+    drop.innerHTML = st.matches.length
+      ? st.matches.map(function (p, i) {
+          return '<li><button type="button" role="option" data-pick="' + i + '"><span>' + esc(p.name) + '</span><small>' +
+            esc([p.rank, p.call].filter(Boolean).join(' · ')) + '</small></button></li>';
+        }).join('')
+      : '<li class="none">No match. Check the spelling, or see the training officer.</li>';
+    drop.hidden = false;
+  }
+
+  function choose(i) {
+    var p = st.matches[i];
+    if (!p) return;
+    st.me = p;
+    store.set(meKey, JSON.stringify({ name: p.name, call: p.call }));
+    store.set('ci-class-me', JSON.stringify({ name: p.name, call: p.call }));
+    render();
+  }
+
+  // ---------- Signing up ----------
+
+  var toastTimer = null;
+  function toast(msg, bad) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast' + (bad ? ' bad' : '');
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, bad ? 6000 : 3500);
+  }
+
+  function act(op, dateId) {
+    var dd = st.cls.dates.filter(function (x) { return x.id === dateId; })[0] || {};
+    var mine = myStatus(isIS() ? dd.topic : '');
+    // Dropping out, or switching away from a seat, takes a second tap.
+    var needs = op === 'drop' || (op === 'join' && mine.seat);
+    if (needs && st.confirm !== op + '|' + dateId) {
+      st.confirm = op + '|' + dateId;
+      clearTimeout(st.confirmTimer);
+      st.confirmTimer = setTimeout(function () { st.confirm = ''; render(); }, 5000);
+      render();
+      return;
+    }
+    st.confirm = '';
+    // In-Service: the officer's PIN goes with every change. Ask for it
+    // (or for an email and a new PIN, the first time) before sending.
+    if (!st.pin && !myPass()) { pinAsk(hasPin() ? 'need' : 'new', '', { op: op, d: dateId }); return; }
+    send(op, dateId);
+  }
+
+  function hasPin() { return !!(st.me && (st.cls.pinSet || []).indexOf(st.me.name + '|' + st.me.call) >= 0); }
+
+  // This phone's remembered pass for each officer (instead of the PIN).
+  function passes() { try { return JSON.parse(store.get('ci-pass') || '{}') || {}; } catch (e) { return {}; } }
+  function myPass() { return st.me ? passes()[st.me.name + '|' + st.me.call] || '' : ''; }
+  function savePass(token) {
+    var all = passes(), k = st.me.name + '|' + st.me.call;
+    if (token) all[k] = token; else delete all[k];
+    store.set('ci-pass', JSON.stringify(all));
+  }
+
+  // ---------- Instant changes ----------
+  // A tap changes the page right away; the saves go to the server one
+  // after another in the background. When the last one comes back, the
+  // page takes the server's lists (which have anything others did too).
+  // If one is refused, the page goes back to the server's lists and says why.
+  st.queue = []; st.sending = false;
+
+  function send(op, dateId) {
+    applyLocal(op, dateId);
+    st.queue.push({ op: op, d: dateId, tries: 0 });
+    render();
+    toast(localMessage(op, dateId));
+    pump();
+  }
+
+  function meOf() { return { n: st.me.name, c: st.me.call }; }
+  function same(x) { return x.n === st.me.name && String(x.c || '') === st.me.call; }
+
+  function applyLocal(op, dateId) {
+    var d = st.cls.dates.filter(function (x) { return x.id === dateId; })[0];
+    if (!d) return;
+    var inGroup = function (x) { return !isIS() || x.topic === d.topic; };
+    if (op === 'join') {
+      st.cls.dates.forEach(function (x) { if (inGroup(x)) x['in'] = x['in'].filter(function (y) { return !same(y); }); });
+      d.wait = d.wait.filter(function (y) { return !same(y); });
+      d['in'].push(meOf());
+    } else if (op === 'wait') {
+      st.cls.dates.forEach(function (x) { if (inGroup(x)) x.wait = x.wait.filter(function (y) { return !same(y); }); });
+      d.wait.push(meOf());
+    } else if (op === 'drop') {
+      d['in'] = d['in'].filter(function (y) { return !same(y); });
+      if (d.wait.length && d['in'].length < d.seats) d['in'].push(d.wait.shift()); // first on the waitlist moves in
+    } else if (op === 'unwait') {
+      d.wait = d.wait.filter(function (y) { return !same(y); });
+    }
+    // In-Service: once they've given a PIN, the page knows they have one.
+    if (st.pin && !hasPin()) (st.cls.pinSet = st.cls.pinSet || []).push(st.me.name + '|' + st.me.call);
+  }
+
+  function localMessage(op, dateId) {
+    var d = st.cls.dates.filter(function (x) { return x.id === dateId; })[0] || {};
+    var what = (d.topic ? d.topic + ', ' : '') + shortDay(d.date) + (times(d) ? ' ' + times(d) : '');
+    return op === 'join' ? 'Signed up for ' + what + '.'
+      : op === 'wait' ? 'On the waitlist for ' + what + '.'
+      : op === 'drop' ? 'Dropped out of ' + what + '.'
+      : 'Left the waitlist for ' + what + '.';
+  }
+
+  function pump() {
+    savingBadge();
+    if (st.sending || !st.queue.length) return;
+    var j = st.queue[0];
+    st.sending = true;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        st.sending = false;
+        st.queue.shift();
+        if (res && res.gone) { st.queue = []; savingBadge(); stop('Class sign-up', res.message); return; }
+        if (!res || !res.ok) {
+          // Refused: show the real lists and say why. Later taps are dropped.
+          st.queue = [];
+          if (res && res.cls) { st.cls = res.cls; st.today = res.today || st.today; } else refresh(true);
+          render();
+          savingBadge();
+          if (res && res.pin) {
+            // The PIN or this phone's pass didn't work (maybe it was reset): ask again.
+            st.pin = ''; st.email = ''; savePass('');
+            pinAsk(res.pin, res.pin === 'need' && !res.message ? '' : res.message, { op: j.op, d: j.d });
+            render();
+            return;
+          }
+          toast((res && res.message) || 'That didn\'t save. Try again.', true);
+          return;
+        }
+        // A right PIN: this phone remembers it from now on.
+        if (res.token) { savePass(res.token); st.pin = ''; st.email = ''; }
+        if (!st.queue.length) {
+          st.cls = res.cls; st.today = res.today || st.today;
+          if (!(document.activeElement && document.activeElement.id === 'q')) render();
+        }
+        pump();
+      })
+      .withFailureHandler(function () {
+        st.sending = false;
+        // No answer (signal dropped): try again a couple of times.
+        if (j.tries < 2) { j.tries++; savingBadge(true); setTimeout(pump, 1500 * j.tries); return; }
+        st.queue = [];
+        savingBadge();
+        refresh(true);
+        toast('That didn\'t save (no connection). Check your signal and tap again.', true);
+      })
+      .ciClassSignup({ c: DATA.c, k: DATA.k, person: { name: st.me.name, call: st.me.call }, d: j.d, op: j.op, device: device,
+        pin: st.pin || '', email: st.email || '', token: st.pin ? '' : myPass() });
+  }
+
+  var badgeTimer = null;
+  function savingBadge(retrying) {
+    var el = $('saving');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'saving'; el.className = 'saving'; el.hidden = true;
+      el.setAttribute('role', 'status');
+      document.body.appendChild(el);
+    }
+    clearTimeout(badgeTimer);
+    if (st.queue.length) {
+      el.hidden = false;
+      el.className = 'saving' + (retrying ? ' retry' : '');
+      el.textContent = retrying ? 'Reconnecting…' : 'Saving…';
+    } else if (!el.hidden) {
+      el.className = 'saving done';
+      el.textContent = 'Saved';
+      badgeTimer = setTimeout(function () { el.hidden = true; }, 1500);
+    }
+  }
+
+  // Leaving while something is still saving asks first.
+  window.addEventListener('beforeunload', function (e) {
+    if (st.queue.length) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // ---------- In-Service PIN ----------
+  // mode: new (email + make up a PIN), need / wrong (enter the PIN),
+  // locked (too many tries). after = the change to send once it's in.
+  function pinAsk(mode, message, after) {
+    var ov = $('pinov');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'pinov'; ov.className = 'pinov';
+      ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('button');
+        if (e.target === ov || (b && b.id === 'pin-cancel')) { ov.hidden = true; return; }
+        if (b && b.id === 'pin-forgot') { $('pin-forgot-msg').hidden = false; return; }
+        if (b && b.id === 'pin-go') pinSubmit();
+      });
+      ov.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); pinSubmit(); } });
+      ov.addEventListener('input', function (e) {
+        if (e.target.dataset && e.target.dataset.digits != null) { var v = e.target.value.replace(/\D/g, '').slice(0, 4); if (v !== e.target.value) e.target.value = v; }
+        $('pin-err').textContent = '';
+      });
+    }
+    st.pinMode = mode; st.pinAfter = after;
+    var isNew = mode === 'new';
+    var pinBox = function (id, label) {
+      return '<label class="pinf"><span>' + label + '</span><input id="' + id + '" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" data-digits></label>';
+    };
+    ov.innerHTML = '<div class="pincard">' +
+      (isNew
+        ? '<h2 class="pint">Set up your sign-ups</h2><p class="note">Give your email and make up a 4-digit PIN. It\'s one PIN for all your class sign-ups: ' +
+            'you\'ll use it to sign up or make changes from any phone or computer. This phone will remember it.</p>' +
+          '<label class="pinf"><span>Email</span><input id="pin-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com"></label>' +
+          pinBox('pin-1', 'Make up a PIN (4 numbers)') + pinBox('pin-2', 'Type the PIN again')
+        : '<h2 class="pint">Enter your PIN</h2><p class="note">The 4-digit PIN you made the first time you signed up for a class. This phone will remember it.</p>' +
+          pinBox('pin-1', 'PIN')) +
+      '<p class="pin-err" id="pin-err" role="alert">' + esc(mode === 'new' && !message ? '' : message || '') + '</p>' +
+      (isNew ? '' : '<button type="button" class="link" id="pin-forgot">Forgot your PIN?</button>' +
+        '<p class="note" id="pin-forgot-msg" hidden><b>Contact the training coordinator to reset your PIN.</b> Then you can make a new one here.</p>') +
+      '<div class="pinbtns"><button type="button" class="btn ghost" id="pin-cancel">Cancel</button>' +
+        '<button type="button" class="btn" id="pin-go"' + (mode === 'locked' ? ' disabled' : '') + '>' + (isNew ? 'Save and sign up' : 'Continue') + '</button></div>' +
+      '</div>';
+    if (mode === 'locked') $('pin-forgot-msg').hidden = false;
+    ov.hidden = false;
+    var first = $(isNew ? 'pin-email' : 'pin-1');
+    if (first) setTimeout(function () { first.focus(); }, 50);
+  }
+
+  function pinSubmit() {
+    if (st.pinMode === 'locked') return;
+    var err = $('pin-err'), p1 = ($('pin-1').value || '').trim();
+    if (st.pinMode === 'new') {
+      var email = ($('pin-email').value || '').trim();
+      if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(email)) { err.textContent = 'Enter a good email address.'; return; }
+      if (!/^\d{4}$/.test(p1)) { err.textContent = 'Your PIN should be 4 numbers.'; return; }
+      if (p1 !== ($('pin-2').value || '').trim()) { err.textContent = 'The two PINs don\'t match. Type them again.'; return; }
+      st.email = email;
+    } else if (!/^\d{4}$/.test(p1)) { err.textContent = 'Enter your 4-number PIN.'; return; }
+    st.pin = p1;
+    $('pinov').hidden = true;
+    if (st.pinAfter) send(st.pinAfter.op, st.pinAfter.d);
+    st.pinAfter = null;
+  }
+
+  var refreshing = false;
+  function refresh(quiet) {
+    if (refreshing || st.sending || st.queue.length) return;
+    refreshing = true;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        refreshing = false;
+        if (res && res.gone) { stop('Class sign-up', res.message); return; }
+        if (!res || !res.ok || st.sending || st.queue.length) return;
+        st.cls = res.cls; st.today = res.today || st.today;
+        // Don't redraw under someone typing their name.
+        if (document.activeElement && document.activeElement.id === 'q') return;
+        render();
+        if (!quiet) toast('Up to date.');
+      })
+      .withFailureHandler(function () { refreshing = false; if (!quiet) toast('Couldn\'t refresh. Check your signal.', true); })
+      .ciClassState({ c: DATA.c, k: DATA.k });
+  }
+
+  // Keeps the lists current while the page is open.
+  setInterval(function () { if (!document.hidden) refresh(true); }, 45000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(true); });
+
+  app.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.pick != null) { choose(+b.dataset.pick); return; }
+    if (b.id === 'change') { st.me = null; st.confirm = ''; st.pin = ''; st.email = ''; store.set(meKey, ''); store.set('ci-class-me', ''); render(); var q = $('q'); if (q) q.focus(); return; }
+    if (b.id === 'refresh') { refresh(false); return; }
+    if (b.id === 'forget') { savePass(''); st.pin = ''; render(); toast('This phone forgot your PIN.'); return; }
+    if (b.dataset.op) { act(b.dataset.op, b.dataset.d); return; }
+  });
+  app.addEventListener('input', function (e) { if (e.target.id === 'q') drawDrop(); });
+  app.addEventListener('keydown', function (e) {
+    if (e.target.id !== 'q') return;
+    if (e.key === 'Enter' && st.matches.length) { e.preventDefault(); choose(0); }
+    if (e.key === 'Escape') { $('drop').hidden = true; }
+  });
+  document.addEventListener('click', function (e) {
+    var drop = $('drop');
+    if (drop && !drop.hidden && !e.target.closest('.find')) drop.hidden = true;
+  });
+})();
+}
+
+(function () {
+  var q = new URLSearchParams(location.search);
+  var fallback = { ok: false, dept: 'Chelsea Police Department', patch: 'https://i.imgur.com/Yu7RJhS.png' };
+  var go = function (d) { DATA = d || {}; if (!DATA.dept) DATA.dept = fallback.dept; if (!DATA.patch) DATA.patch = fallback.patch; start(); };
+  if (!q.get('c')) { fallback.message = 'Open the class sign-up link or scan the class QR code.'; go(fallback); return; }
+  api('classPage', { c: q.get('c'), k: q.get('k') }).then(go, function () {
+    fallback.message = "Couldn't reach the sign-up page. Check your signal, then try the link again.";
+    go(fallback);
+  });
+})();
+</script>
+</body>
+</html>
