@@ -1,45 +1,22 @@
 <!DOCTYPE html>
 <!--
-  QR CHECK-IN - the page officers land on when they scan.
-
-  It shows the real check-in page (the Gmail Apps Script web app) inside
-  it, full screen. Because Google's page is inside this one, Google's
-  gray "This application was created by a Google Apps Script user" bar
-  doesn't appear, so nothing covers the signature box.
-
-  1. Put your check-in web app address (ends in /exec) on the line below.
-  2. Put this file on any web host (see SETUP.txt, "Hide Google's bar").
-  3. In the Duty Roster's Script Properties, set DR_CHECKIN_PAGE_URL to
-     this page's address. QR codes then point here.
+  Chelsea PD - training sign-in and class sign-up.
+  QR codes and links land here and go to the right page:
+    ?c=...  class sign-up  (class.html)
+    ?t=...  training check-in  (checkin.html)
+  The check-in project's address is in config.js.
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Training sign-in</title>
-<style>
-  html, body { margin: 0; height: 100%; background: #F2F4F8; }
-  iframe { display: block; position: fixed; inset: 0; width: 100%; height: 100%; border: 0; }
-  p { font: 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #13213A; padding: 24px; }
-</style>
-</head>
-<body>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chelsea PD sign-in</title>
 <script>
-  // >>> Put the check-in web app address here (it ends in /exec):
-  var APP_URL = 'https://script.google.com/macros/s/AKfycbxH6lVXqyFvjSkERa3TkG77opTvQjcX8o27vW1480ETXyhzrQ66vPsW2wZCkobPegw/exec';
-
   (function () {
-    if (APP_URL.indexOf('PASTE-YOUR-ID') >= 0) {
-      document.body.innerHTML = '<p>This page isn\'t set up yet. Put the check-in web app address in APP_URL.</p>';
-      return;
-    }
-    // Pass along the training code from the QR (?t=...&k=...).
-    var f = document.createElement('iframe');
-    f.src = APP_URL + (location.search || '');
-    f.title = 'Training sign-in';
-    f.setAttribute('allow', 'clipboard-write');
-    document.body.appendChild(f);
+    var q = location.search || '';
+    location.replace((/[?&]c=/.test(q) ? 'class.html' : 'checkin.html') + q);
   })();
 </script>
-</body>
+</head>
+<body style="font:17px Arial,sans-serif;color:#13213A;padding:24px">Loading…</body>
 </html>

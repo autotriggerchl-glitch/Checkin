@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Training sign-in</title>
+<script src="config.js"></script>
+<style>
+  :root {
+    --navy: #16294A; --gold: #C8A64B; --ink: #13213A; --muted: #5E6A7D; --line: #D5DCE7;
+    --bg: #F2F4F8; --card: #FFFFFF; --ok: #1E7A4C; --err: #B3261E; --focus: #2F5DA8;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+  button, input { font: inherit; color: inherit; }
+  .top { background: var(--navy); color: #fff; border-bottom: 3px solid var(--gold); padding: calc(14px + env(safe-area-inset-top)) 16px 14px; }
+  .top-in { max-width: 560px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+  .top img { width: 44px; height: 44px; object-fit: contain; flex: none; }
+  .top b { display: block; font-size: 17px; }
+  .top span { font-size: 13px; opacity: .8; letter-spacing: .5px; text-transform: uppercase; }
+  /* Extra room at the bottom: on phones Google's "created by a Google
+     Apps Script user" bar can sit over the bottom of the page. */
+  main { max-width: 560px; margin: 0 auto; padding: 16px 16px calc(140px + env(safe-area-inset-bottom)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 0 0 14px; }
+  .title { margin: 0; font-size: 22px; line-height: 1.25; color: var(--navy); }
+  .meta { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
+  .cat { display: inline-block; margin-top: 8px; padding: 2px 8px; border-radius: 6px; background: #E6EBF3; color: var(--navy); font-size: 13px; font-weight: 600; }
+  h2 { margin: 0 0 10px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  h2 i { font-style: normal; color: var(--navy); }
+
+  .find { position: relative; }
+  input[type=text] {
+    width: 100%; min-height: 50px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; font-size: 17px;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px rgba(47, 93, 168, .18); }
+  .drop {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5; margin: 0; padding: 4px; list-style: none;
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 28px rgba(19, 33, 58, .16);
+  }
+  .drop[hidden] { display: none; }
+  .drop button {
+    display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; min-height: 50px;
+    padding: 6px 12px; border: 0; border-radius: 9px; background: none; text-align: left; cursor: pointer;
+  }
+  .drop button:hover, .drop button:focus { background: #EEF2F8; outline: none; }
+  .drop small { color: var(--muted); font-size: 14px; white-space: nowrap; }
+  .drop .none { padding: 12px; color: var(--muted); font-size: 15px; }
+  .picked { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 8px 8px 14px; border: 1.5px solid var(--navy); border-radius: 12px; background: #F4F7FC; }
+  .picked div { flex: 1; min-width: 0; }
+  .picked b { display: block; }
+  .picked small { color: var(--muted); font-size: 14px; }
+  .link { border: 0; background: none; color: var(--focus); font-weight: 600; padding: 10px 2px; cursor: pointer; font-size: 15px; }
+  .guest { display: grid; gap: 8px; margin-top: 4px; }
+
+  .roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .roles button {
+    min-height: 54px; padding: 6px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff;
+    font-weight: 600; font-size: 15px; cursor: pointer;
+  }
+  .roles button[aria-checked=true] { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+  .signbtn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 100%; min-height: 96px;
+    border: 2px dashed var(--navy); border-radius: 12px; background: #F4F7FC; color: var(--navy); font-size: 20px; font-weight: 700; cursor: pointer;
+  }
+  .signbtn small { font-size: 14px; font-weight: 500; color: var(--muted); }
+  .sigimg { display: block; width: 100%; max-width: 360px; margin: 0 auto; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+
+  /* Full-screen signing box. */
+  .sigov {
+    position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; background: var(--bg);
+    touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none;
+  }
+  .sigov[hidden] { display: none; }
+  .sighead { background: var(--navy); color: #fff; border-bottom: 3px solid var(--gold); padding: calc(12px + env(safe-area-inset-top)) 16px 12px; }
+  .sighead b { display: block; font-size: 19px; }
+  .sighead span { font-size: 14px; opacity: .85; }
+  .sighead.warn span { color: #FFD479; opacity: 1; font-weight: 700; }
+  .sigarea { position: relative; flex: 1; min-height: 0; margin: 12px; background: #fff; border: 2px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .sigarea canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .sigline { position: absolute; left: 7%; right: 7%; bottom: 30%; border-bottom: 2px solid #AEB7C6; pointer-events: none; }
+  .sigline::before { content: "X"; position: absolute; left: 0; bottom: 4px; color: #AEB7C6; font-weight: 700; font-size: 20px; }
+  .sigbtns { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 10px; padding: 0 12px calc(12px + env(safe-area-inset-bottom)); }
+  .sbtn { min-height: 56px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; font-size: 17px; font-weight: 700; cursor: pointer; }
+  .sbtn.main { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .sigrow { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; color: var(--muted); font-size: 14px; }
+
+  .certify { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; font-size: 16px; }
+  .certify input { flex: none; width: 26px; height: 26px; margin: 0; accent-color: var(--navy); }
+
+  .go {
+    display: block; width: 100%; min-height: 56px; border: 0; border-radius: 14px; background: var(--navy); color: #fff;
+    font-size: 18px; font-weight: 700; cursor: pointer;
+  }
+  .go:disabled { opacity: .6; }
+  .err { color: var(--err); font-weight: 600; min-height: 1.4em; margin: 10px 2px 0; }
+
+  .done { text-align: center; padding: 28px 18px; }
+  .done .mark { width: 76px; height: 76px; margin: 0 auto 12px; border-radius: 50%; background: var(--ok); display: grid; place-items: center; }
+  .done h1 { margin: 0 0 6px; font-size: 26px; color: var(--ok); }
+  .done p { margin: 4px 0; }
+  .note { color: var(--muted); font-size: 15px; }
+  .stop { text-align: center; padding: 30px 18px; }
+  .stop h1 { margin: 0 0 8px; font-size: 21px; color: var(--navy); }
+  .bartip { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; background: #FFF4D6; border: 1px solid #E8C96A; color: #5A4300; font-size: 15px; }
+
+  /* Qualification: the officer's own score */
+  .score { display: grid; grid-template-columns: 1fr 120px; gap: 10px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+  .score:first-of-type { border-top: 0; padding-top: 2px; }
+  .score b { display: block; font-size: 17px; }
+  .score small { color: var(--muted); font-size: 14px; }
+  .score input[type=text] { text-align: center; font-size: 22px; font-weight: 700; }
+  .paper { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; font-size: 15px; }
+  .paper input { width: 24px; height: 24px; margin: 0; accent-color: var(--navy); }
+  .score input.sn { grid-column: 1 / -1; font-size: 16px; font-weight: 500; text-align: left; text-transform: uppercase; }
+  .score input.sn::placeholder { text-transform: none; font-weight: 400; }
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <img id="patch" alt="" hidden>
+  <div><span>Training sign-in</span><b id="dept"></b></div>
+</div></header>
+<main id="app"><p style="text-align:center;color:#5E6A7D;padding:40px 0">Loading…</p></main>
+
+<script>
+// This page lives on GitHub. Google won't show pages from the check-in
+// project, so this page asks the project for its data instead
+// (APP_URL is in config.js).
+var DATA = null;
+var FN = { ciSubmit: 'checkinSubmit', ciClassSignup: 'classSignup', ciClassState: 'classState' };
+function api(name, arg) {
+  return fetch(APP_URL, { method: 'POST', body: JSON.stringify({ pub: name, arg: arg }) })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+}
+function runner(ok, fail) {
+  var r = {
+    withSuccessHandler: function (f) { return runner(f, fail); },
+    withFailureHandler: function (f) { return runner(ok, f); }
+  };
+  Object.keys(FN).forEach(function (k) {
+    r[k] = function (arg) {
+      api(FN[k], arg).then(function (res) { if (ok) ok(res); }, function (e) { if (fail) fail(e); });
+    };
+  });
+  return r;
+}
+var google = { script: { run: runner(null, null) } };
+
+function start() {
+(function () {
+  var app = document.getElementById('app');
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  };
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+
+  $('dept').textContent = DATA.dept || '';
+  if (DATA.patch) { var img = $('patch'); img.src = DATA.patch; img.hidden = false; img.onerror = function () { img.hidden = true; }; }
+
+  if (!DATA.ok) { stop('Can\'t sign in', DATA.message); return; }
+
+  // Google puts a gray "created by a Google Apps Script user" box over
+  // public pages on phones, and it blocks the signature box until it's
+  // closed. When this page is shown by itself (not inside
+  // checkin-page.html, which hides that box), tell officers to close it.
+  var framed = false;
+  try { framed = window.top !== window.self; } catch (e) { framed = true; }
+  var BAR_TIP = true ? '' : '<div class="bartip"><b>First:</b> if a gray Google box is on the screen, tap its <b>X</b> to close it. ' +
+    'Then you can sign.</div>';
+
+  var T = DATA.training;
+  var doneKey = 'ci-done-' + DATA.pass.id;
+  var device = store.get('ci-device');
+  if (!device) { device = String(Date.now()) + Math.random().toString(36).slice(2, 10); store.set('ci-device', device); }
+
+  var st = { person: null, guest: false, role: '', ink: false, sending: false, matches: [] };
+
+  // Sorted by last name for the list.
+  var PEOPLE = (DATA.people || []).map(function (p) {
+    var name = String(p[0] || ''), words = name.toLowerCase().split(/[\s.,'-]+/).filter(Boolean);
+    return { name: name, call: String(p[1] || ''), rank: String(p[2] || ''), words: words, last: words[words.length - 1] || '' };
+  }).sort(function (a, b) { return (a.last + a.name).localeCompare(b.last + b.name); });
+
+  var QUAL = DATA.qual && DATA.qual.courses && DATA.qual.courses.length ? DATA.qual : null;
+  var already = null;
+  try { already = JSON.parse(store.get(doneKey) || 'null'); } catch (e) {}
+  // A qualification: the officer who used this phone can come back to add a score.
+  if (QUAL && already && already.name) {
+    st.person = PEOPLE.filter(function (p) { return p.name === already.name; })[0] || null;
+    already = null;
+  }
+  if (already && already.name) {
+    stop('This phone already signed in', esc(already.name) + ' signed in to this training at ' + esc(already.at) +
+      '.<br><br>Each phone signs in one person. Ask the supervisor to add anyone else.', true);
+    return;
+  }
+
+  render();
+
+  function stop(title, message, html) {
+    app.innerHTML = '<div class="card stop"><h1>' + esc(title) + '</h1><p class="note">' + (html ? message : esc(message)) + '</p></div>';
+  }
+
+  function day(d) {
+    var m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return d || '';
+    return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(+m[1], +m[2] - 1, +m[3]).getDay()] + ' ' + (+m[2]) + '/' + (+m[3]) + '/' + m[1];
+  }
+
+  function render() {
+    if (QUAL) { renderQual(); return; }
+    app.innerHTML =
+      '<div class="card"><h1 class="title">' + esc(T.title) + '</h1>' +
+        '<p class="meta">' + esc([day(T.date), T.time, T.location].filter(Boolean).join(' · ')) + '</p>' +
+        (T.category ? '<span class="cat">' + esc(T.category) + '</span>' : '') + '</div>' +
+
+      '<div class="card"><h2><i>1</i> &nbsp;Your name</h2><div id="who"></div></div>' +
+
+      '<div class="card"><h2><i>2</i> &nbsp;My role in this training</h2><div class="roles" role="radiogroup" aria-label="My role">' +
+        [['officer', 'Attendee'], ['instructor', 'Instructor'], ['roleplayer', 'Role player']].map(function (r) {
+          return '<button type="button" role="radio" aria-checked="false" data-role="' + r[0] + '">' + r[1] + '</button>';
+        }).join('') + '</div></div>' +
+
+      '<div class="card"><h2><i>3</i> &nbsp;Sign with your finger</h2>' + BAR_TIP +
+        '<div id="sigslot"></div></div>' +
+
+      '<div class="card"><label class="certify"><input type="checkbox" id="certify"><span>' + esc(DATA.certify) + '</span></label></div>' +
+
+      '<button type="button" class="go" id="go">Sign in</button>' +
+      '<p class="err" id="err" role="alert"></p>';
+
+    drawWho();
+    setUpPad();
+    app.addEventListener('click', onClick);
+    app.addEventListener('input', onInput);
+    app.addEventListener('keydown', onKey);
+    $('certify').addEventListener('change', function () { $('err').textContent = ''; });
+  }
+
+  // A qualification session: pick your name, enter your score, sign.
+  // The instructor reviews it and signs off.
+  function renderQual() {
+    var label = document.querySelector('.top span');
+    if (label) label.textContent = 'Firearms qualification';
+    app.innerHTML =
+      '<div class="card"><h1 class="title">' + esc(T.title) + '</h1>' +
+        '<p class="meta">Firearms qualification</p></div>' +
+
+      '<div class="card"><h2><i>1</i> &nbsp;Your name</h2><div id="who"></div></div>' +
+
+      '<div class="card"><h2><i>2</i> &nbsp;Your score</h2>' +
+        QUAL.courses.map(function (c) {
+          return '<div class="score"><div><b>' + esc(c.name) + '</b><small>Hits out of ' + c.rounds + ' · pass is ' + c.pass + '</small></div>' +
+            '<input type="text" inputmode="numeric" maxlength="3" autocomplete="off" data-hits="' + esc(c.key) + '" aria-label="' + esc(c.name) + ' hits">' +
+            '<label class="paper"><input type="checkbox" data-paper="' + esc(c.key) + '" checked> Every round on the silhouette</label>' +
+            '<input type="text" class="sn" data-sn="' + esc(c.key) + '" autocomplete="off" autocapitalize="characters" spellcheck="false" ' +
+              'placeholder="' + esc(c.name) + ' serial number" aria-label="' + esc(c.name) + ' serial number"></div>';
+        }).join('') +
+        '<p class="note" style="margin:10px 0 0">Leave a weapon blank if you haven\'t shot it yet. You can scan again later to add it. ' +
+          'Your instructor reviews your score and signs off.</p></div>' +
+
+      '<div class="card"><h2><i>3</i> &nbsp;Sign with your finger</h2>' + BAR_TIP +
+        '<div id="sigslot"></div></div>' +
+
+      '<div class="card"><label class="certify"><input type="checkbox" id="certify"><span>' + esc(DATA.certify) + '</span></label></div>' +
+
+      '<button type="button" class="go" id="go">Send</button>' +
+      '<p class="err" id="err" role="alert"></p>';
+
+    drawWho();
+    setUpPad();
+    app.addEventListener('click', onClick);
+    app.addEventListener('input', onInput);
+    app.addEventListener('keydown', onKey);
+    $('certify').addEventListener('change', function () { $('err').textContent = ''; });
+  }
+
+  // ---------- 1. Name ----------
+
+  function drawWho() {
+    var box = $('who');
+    if (st.person) {
+      var p = st.person;
+      box.innerHTML = '<div class="picked"><div><b>' + esc(p.name) + '</b><small>' + esc([p.rank, p.call].filter(Boolean).join(' · ')) + '</small></div>' +
+        '<button type="button" class="link" id="change">Change</button></div>';
+      return;
+    }
+    if (st.guest) {
+      box.innerHTML = '<div class="guest">' +
+        '<input type="text" id="gname" autocomplete="name" placeholder="First and last name" aria-label="First and last name">' +
+        '<input type="text" id="gagency" autocomplete="organization" placeholder="Department or agency (if not ours)" aria-label="Department or agency">' +
+        '</div><button type="button" class="link" id="backlist">Back to the list</button>';
+      return;
+    }
+    box.innerHTML = '<div class="find">' +
+        '<input type="text" id="q" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" ' +
+          'placeholder="Type your last name or call sign" aria-label="Your name" aria-autocomplete="list" aria-controls="drop">' +
+        '<ul class="drop" id="drop" role="listbox" hidden></ul></div>' +
+      (QUAL ? '<p class="note" style="margin:8px 2px 0">Not in the list? See the instructor.</p>'
+        : '<button type="button" class="link" id="guest">Not in the list? Type your name</button>');
+  }
+
+  function search(q) {
+    var parts = q.toLowerCase().split(/[\s.,]+/).filter(Boolean);
+    if (!parts.length) return [];
+    return PEOPLE.filter(function (p) {
+      var call = p.call.toLowerCase();
+      return parts.every(function (w) {
+        return (call && call.indexOf(w) === 0) || p.words.some(function (x) { return x.indexOf(w) === 0; });
+      });
+    }).slice(0, 6);
+  }
+
+  function drawDrop() {
+    var drop = $('drop'), q = $('q').value.trim();
+    st.matches = search(q);
+    if (!q) { drop.hidden = true; drop.innerHTML = ''; return; }
+    drop.innerHTML = st.matches.length
+      ? st.matches.map(function (p, i) {
+          return '<li><button type="button" role="option" data-pick="' + i + '"><span>' + esc(p.name) + '</span><small>' +
+            esc([p.rank, p.call].filter(Boolean).join(' · ')) + '</small></button></li>';
+        }).join('')
+      : '<li class="none">No match. Check the spelling, or tap "Not in the list?" below.</li>';
+    drop.hidden = false;
+  }
+
+  function choose(i) {
+    var p = st.matches[i];
+    if (!p) return;
+    st.person = p;
+    $('err').textContent = '';
+    drawWho();
+  }
+
+  // ---------- 3. Signature ----------
+
+  // The signature is taken on a full-screen box that opens when the
+  // officer taps "Tap here to sign". A big box that fills the screen is
+  // much easier to sign on a phone, and nothing behind it can scroll.
+  var sig = { strokes: [], cur: null, open: false };
+
+  function setUpPad() {
+    st.sig = ''; st.ink = false;
+    drawSig();
+    if ($('sigov')) return;
+    var ov = document.createElement('div');
+    ov.className = 'sigov'; ov.id = 'sigov'; ov.hidden = true;
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Sign your name');
+    ov.innerHTML =
+      '<div class="sighead" id="sighead"><b>Sign with your finger</b><span id="sigmsg">Sign on the line, then tap Done.</span></div>' +
+      '<div class="sigarea" id="sigarea"><canvas id="pad" aria-label="Signature box"></canvas><div class="sigline"></div></div>' +
+      '<div class="sigbtns"><button type="button" class="sbtn" id="scancel">Cancel</button>' +
+        '<button type="button" class="sbtn" id="sclear">Clear</button>' +
+        '<button type="button" class="sbtn main" id="sdone">Done</button></div>';
+    document.body.appendChild(ov);
+
+    var c = $('pad');
+    var pt = function (e) {
+      var r = c.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+    var start = function (e) {
+      sig.cur = [pt(e)]; sig.strokes.push(sig.cur);
+      paint();
+      $('sighead').className = 'sighead'; $('sigmsg').textContent = 'Sign on the line, then tap Done.';
+    };
+    var move = function (e) {
+      if (!sig.cur) return;
+      var p = pt(e), q = sig.cur[sig.cur.length - 1];
+      if (Math.abs(p.x - q.x) + Math.abs(p.y - q.y) < 1) return;
+      sig.cur.push(p); paintLast();
+    };
+    var stop = function () { sig.cur = null; };
+
+    // Fingers: touch events, with scrolling stopped so the phone draws
+    // instead of moving the page.
+    var opts = { passive: false };
+    c.addEventListener('touchstart', function (e) { e.preventDefault(); if (e.touches.length === 1) start(e.touches[0]); }, opts);
+    c.addEventListener('touchmove', function (e) { e.preventDefault(); if (e.touches.length === 1) move(e.touches[0]); }, opts);
+    c.addEventListener('touchend', function (e) { e.preventDefault(); stop(); }, opts);
+    c.addEventListener('touchcancel', stop);
+    // Nothing behind the box moves while it's open.
+    ov.addEventListener('touchmove', function (e) { e.preventDefault(); }, opts);
+
+    // Mouse and stylus.
+    c.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'touch') return;
+      e.preventDefault();
+      try { c.setPointerCapture(e.pointerId); } catch (x) {}
+      start(e);
+    });
+    c.addEventListener('pointermove', function (e) { if (e.pointerType !== 'touch') { e.preventDefault(); move(e); } });
+    c.addEventListener('pointerup', function (e) { if (e.pointerType !== 'touch') stop(); });
+    c.addEventListener('pointercancel', function (e) { if (e.pointerType !== 'touch') stop(); });
+
+    $('sclear').addEventListener('click', function () { sig.strokes = []; sig.cur = null; paint(); });
+    $('scancel').addEventListener('click', function () { closeSig(); });
+    $('sdone').addEventListener('click', function () {
+      if (!inked()) {
+        $('sighead').className = 'sighead warn'; $('sigmsg').textContent = 'Sign your name first, then tap Done.';
+        return;
+      }
+      var d = sigImage();
+      if (!d) {
+        $('sighead').className = 'sighead warn'; $('sigmsg').textContent = 'That signature is too detailed. Tap Clear and sign again.';
+        return;
+      }
+      st.sig = d; st.ink = true;
+      closeSig();
+      drawSig();
+      var err = $('err'); if (err) err.textContent = '';
+    });
+    // Turning the phone: resize the box and redraw what's there.
+    window.addEventListener('resize', function () { if (sig.open) fitPad(); });
+  }
+
+  function drawSig() {
+    var slot = $('sigslot');
+    if (!slot) return;
+    slot.innerHTML = st.sig ?
+      '<img class="sigimg" alt="Your signature" src="' + st.sig + '">' +
+        '<div class="sigrow"><span>Signed</span><button type="button" class="link" id="resign">Sign again</button></div>' :
+      '<button type="button" class="signbtn" id="signbtn">Tap here to sign<small>A signing box opens</small></button>';
+    var b = $('resign') || $('signbtn');
+    b.addEventListener('click', openSig);
+  }
+
+  var lockedScroll = 0;
+  function openSig() {
+    var active = document.activeElement;
+    if (active && active.blur) active.blur();   // put the keyboard away
+    lockedScroll = window.pageYOffset || 0;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    sig.strokes = []; sig.cur = null; sig.open = true;
+    $('sighead').className = 'sighead'; $('sigmsg').textContent = 'Sign on the line, then tap Done.';
+    $('sigov').hidden = false;
+    fitPad();
+    // Some phones settle the size a moment later.
+    setTimeout(function () { if (sig.open) fitPad(); }, 250);
+  }
+
+  function closeSig() {
+    sig.open = false; sig.cur = null;
+    $('sigov').hidden = true;
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
+    window.scrollTo(0, lockedScroll);
+  }
+
+  function fitPad() {
+    var c = $('pad'), r = c.getBoundingClientRect();
+    var k = Math.min(window.devicePixelRatio || 1, 2);
+    var w = Math.max(1, Math.round(r.width * k)), h = Math.max(1, Math.round(r.height * k));
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    paint();
+  }
+
+  function penFor(ctx, c) {
+    var k = c.width / (c.getBoundingClientRect().width || c.width);
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.strokeStyle = '#111'; ctx.fillStyle = '#111'; ctx.lineWidth = 3.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  }
+
+  function strokeOn(ctx, pts) {
+    if (pts.length === 1) { ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, ctx.lineWidth / 2, 0, 2 * Math.PI); ctx.fill(); return; }
+    ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+  }
+
+  function paint() {
+    var c = $('pad'), ctx = c.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+    penFor(ctx, c);
+    sig.strokes.forEach(function (pts) { strokeOn(ctx, pts); });
+  }
+
+  function paintLast() {
+    var c = $('pad'), ctx = c.getContext('2d'), pts = sig.cur, n = pts.length;
+    penFor(ctx, c);
+    ctx.beginPath(); ctx.moveTo(pts[n - 2].x, pts[n - 2].y); ctx.lineTo(pts[n - 1].x, pts[n - 1].y); ctx.stroke();
+  }
+
+  function inked() {
+    var n = 0;
+    sig.strokes.forEach(function (pts) { n += pts.length; });
+    return n >= 3;
+  }
+
+  // The signature, trimmed and centered in a small picture that fits in
+  // one spreadsheet cell.
+  function sigImage() {
+    var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    sig.strokes.forEach(function (pts) {
+      pts.forEach(function (p) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); });
+    });
+    var W = 360, H = 120, PAD = 10;
+    var w = Math.max(x1 - x0, 1), h = Math.max(y1 - y0, 1);
+    var k = Math.min((W - 2 * PAD) / w, (H - 2 * PAD) / h, 2);
+    var s = document.createElement('canvas');
+    s.width = W; s.height = H;
+    var ctx = s.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+    ctx.setTransform(k, 0, 0, k, (W - w * k) / 2 - x0 * k, (H - h * k) / 2 - y0 * k);
+    ctx.strokeStyle = '#111'; ctx.fillStyle = '#111'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(1.8, Math.min(3.2, 2.6 * k)) / k;
+    sig.strokes.forEach(function (pts) { strokeOn(ctx, pts); });
+    var d = s.toDataURL('image/png');
+    if (d.length > 45000) d = s.toDataURL('image/jpeg', 0.7);
+    return d.length <= 45000 ? d : '';
+  }
+
+  function signatureData() { return st.sig || ''; }
+
+  // ---------- Events ----------
+
+  function onClick(e) {
+    var b = e.target.closest && e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.pick != null) { choose(+b.dataset.pick); return; }
+    if (b.id === 'change') { st.person = null; drawWho(); $('q').focus(); return; }
+    if (b.id === 'guest') { st.guest = true; drawWho(); $('gname').focus(); return; }
+    if (b.id === 'backlist') { st.guest = false; drawWho(); $('q').focus(); return; }
+    if (b.dataset.role) {
+      st.role = b.dataset.role;
+      document.querySelectorAll('[data-role]').forEach(function (x) { x.setAttribute('aria-checked', String(x === b)); });
+      $('err').textContent = '';
+      return;
+    }
+    if (b.id === 'go') submit();
+  }
+
+  function onInput(e) {
+    if (e.target.id === 'q') drawDrop();
+    if (e.target.dataset && e.target.dataset.hits != null) {
+      var v = e.target.value.replace(/\D/g, '');
+      if (v !== e.target.value) e.target.value = v;
+    }
+    $('err').textContent = '';
+  }
+
+  function onKey(e) {
+    if (e.target.id !== 'q') return;
+    if (e.key === 'Enter' && st.matches.length) { e.preventDefault(); choose(0); }
+    if (e.key === 'Escape') { $('drop').hidden = true; }
+  }
+
+  document.addEventListener('click', function (e) {
+    var drop = $('drop');
+    if (drop && !drop.hidden && !e.target.closest('.find')) drop.hidden = true;
+  });
+
+  // ---------- Sign in ----------
+
+  function submit() {
+    if (st.sending) return;
+    var err = $('err');
+    var req = { pass: DATA.pass, role: st.role, certify: $('certify').checked, device: device };
+    if (st.person) req.person = { name: st.person.name, call: st.person.call };
+    else if (st.guest) req.guest = { name: $('gname').value, agency: $('gagency').value };
+    var badScore = '';
+    if (QUAL) {
+      req.qual = true;
+      req.scores = {};
+      QUAL.courses.forEach(function (c) {
+        var v = String(document.querySelector('[data-hits="' + c.key + '"]').value || '').trim();
+        if (!v) return;
+        if (+v > c.rounds) badScore = c.name + ' hits can\'t be more than ' + c.rounds + '.';
+        req.scores[c.key] = { h: v, p: document.querySelector('[data-paper="' + c.key + '"]').checked ? 1 : 0,
+          sn: String(document.querySelector('[data-sn="' + c.key + '"]').value || '').trim().toUpperCase().slice(0, 30) };
+      });
+    }
+
+    var problem =
+      !st.person && !st.guest ? 'Pick your name from the list.' :
+      st.guest && !/\S+\s+\S+/.test($('gname').value.trim()) ? 'Type your first and last name.' :
+      badScore ? badScore :
+      !QUAL && !st.role ? 'Pick your role in this training.' :
+      !st.ink ? 'Tap "Tap here to sign" and sign your name.' :
+      !req.certify ? 'Check the certification box.' : '';
+    if (problem) { err.textContent = problem; return; }
+
+    req.signature = signatureData();
+    if (!req.signature) { err.textContent = 'Tap Sign again and sign your name.'; return; }
+
+    var go = $('go');
+    st.sending = true; go.disabled = true; go.textContent = QUAL ? 'Sending…' : 'Signing in…'; err.textContent = '';
+    google.script.run
+      .withSuccessHandler(function (res) {
+        st.sending = false; go.disabled = false; go.textContent = QUAL ? 'Send' : 'Sign in';
+        if (!res || !res.ok) {
+          if (res && res.expired) { stop('Scan again', res.message); return; }
+          err.textContent = (res && res.message) || 'That didn\'t go through. Tap Sign in again.';
+          return;
+        }
+        store.set(doneKey, JSON.stringify({ name: res.name, at: res.at }));
+        success(res);
+      })
+      .withFailureHandler(function () {
+        st.sending = false; go.disabled = false; go.textContent = QUAL ? 'Send' : 'Sign in';
+        err.textContent = 'No connection. Check your signal and tap Sign in again.';
+      })
+      .ciSubmit(req);
+  }
+
+  function success(res) {
+    if (res.qual) {
+      app.innerHTML = '<div class="card done">' +
+        '<div class="mark"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>' +
+        '<h1>Sent</h1>' +
+        '<p><b>' + esc(res.name) + '</b> · ' + esc(res.at) + '</p>' +
+        (res.scores && res.scores.length ? '<p>' + esc(res.scores.join(' · ')) + '</p>' : '<p>Checked in. No score entered yet.</p>') +
+        '<p class="note" style="margin-top:14px">Your instructor reviews it and signs off. To add a score later, scan the code again.</p></div>';
+      window.scrollTo(0, 0);
+      return;
+    }
+    app.innerHTML = '<div class="card done">' +
+      '<div class="mark"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>' +
+      '<h1>You\'re signed in</h1>' +
+      '<p><b>' + esc(res.name) + '</b></p>' +
+      '<p>' + esc(res.role) + ' · ' + esc(res.at) + '</p>' +
+      '<p class="note" style="margin-top:14px">' + esc(res.title) + '</p>' +
+      '<p class="note">You can close this page.</p></div>';
+    window.scrollTo(0, 0);
+  }
+})();
+}
+
+(function () {
+  var q = new URLSearchParams(location.search);
+  var fallback = { ok: false, dept: 'Chelsea Police Department', patch: 'https://i.imgur.com/Yu7RJhS.png' };
+  var go = function (d) { DATA = d || {}; if (!DATA.dept) DATA.dept = fallback.dept; if (!DATA.patch) DATA.patch = fallback.patch; start(); };
+  if (!q.get('t')) { fallback.message = "Scan the QR code on the supervisor's screen to sign in."; go(fallback); return; }
+  api('checkinPage', { t: q.get('t'), k: q.get('k') }).then(go, function () {
+    fallback.message = "Couldn't reach the sign-in page. Check your signal, then scan the QR code again.";
+    go(fallback);
+  });
+})();
+</script>
+</body>
+</html>
