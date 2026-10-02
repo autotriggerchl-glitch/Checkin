@@ -779,9 +779,10 @@ function start() {
     });
   }, function () {
     clearTimeout(slow);
-    fallback.message = "Couldn't reach the sign-in page. Check your signal, then scan the QR code again.";
+   fallback.message = "Couldn't reach the sign-in page. Check your signal, then scan the QR code again.";
     go(fallback);
   });
+})();
 </script>
 </body>
 </html>
