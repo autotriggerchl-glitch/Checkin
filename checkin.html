@@ -166,6 +166,82 @@ function runner(ok, fail) {
 }
 var google = { script: { run: runner(null, null) } };
 
+// ---------- The lock (must match CheckinLock.gs in the Duty Roster) ----------
+// The key is in the QR link after #. Browsers never send that part to a
+// server, so only this phone and the Duty Roster ever have it.
+var LOCK = (function () {
+  var enc = new TextEncoder(), dec = new TextDecoder();
+  var key = (location.hash.match(/[#&]x=([A-Za-z0-9_-]+)/) || [])[1] || '';
+  function b64ToBytes(s) {
+    s = String(s).replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    var bin = atob(s), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function bytesToB64(u) {
+    var s = '';
+    for (var i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  function hmacKey(raw) { return crypto.subtle.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']); }
+  function hmac(k, msg) { return crypto.subtle.sign('HMAC', k, msg).then(function (b) { return new Uint8Array(b); }); }
+  var parts = null;
+  function getParts() {
+    if (!parts) {
+      parts = hmacKey(b64ToBytes(key))
+        .then(function (k) { return Promise.all([hmac(k, enc.encode('enc')), hmac(k, enc.encode('mac'))]); })
+        .then(function (r) { return Promise.all([hmacKey(r[0]), hmacKey(r[1])]); })
+        .then(function (r) { return { enc: r[0], mac: r[1] }; });
+    }
+    return parts;
+  }
+  function stream(encKey, nonce, data) {
+    var jobs = [];
+    for (var b = 0; b < Math.ceil(data.length / 32); b++) {
+      var m = new Uint8Array(20);
+      m.set(nonce, 0);
+      m[16] = (b >>> 24) & 255; m[17] = (b >>> 16) & 255; m[18] = (b >>> 8) & 255; m[19] = b & 255;
+      jobs.push(hmac(encKey, m));
+    }
+    return Promise.all(jobs).then(function (ks) {
+      var out = new Uint8Array(data.length);
+      for (var i = 0; i < data.length; i++) out[i] = data[i] ^ ks[i >> 5][i & 31];
+      return out;
+    });
+  }
+  return {
+    has: function () { return !!key && !!(window.crypto && crypto.subtle); },
+    open: function (b64) {
+      var all = b64ToBytes(b64);
+      if (all.length < 48) return Promise.reject(new Error('short'));
+      var nonce = all.subarray(0, 16), ct = all.subarray(16, all.length - 32), tag = all.subarray(all.length - 32);
+      return getParts().then(function (p) {
+        return hmac(p.mac, all.subarray(0, all.length - 32)).then(function (want) {
+          var d = 0;
+          for (var i = 0; i < 32; i++) d |= want[i] ^ tag[i];
+          if (d) throw new Error('bad key');
+          return stream(p.enc, nonce, ct);
+        });
+      }).then(function (pt) { return JSON.parse(dec.decode(pt)); });
+    },
+    seal: function (obj) {
+      var pt = enc.encode(JSON.stringify(obj)), nonce = crypto.getRandomValues(new Uint8Array(16));
+      return getParts().then(function (p) {
+        return stream(p.enc, nonce, pt).then(function (ct) {
+          var body = new Uint8Array(16 + ct.length);
+          body.set(nonce, 0); body.set(ct, 16);
+          return hmac(p.mac, body).then(function (tag) {
+            var all = new Uint8Array(body.length + 32);
+            all.set(body, 0); all.set(tag, body.length);
+            return bytesToB64(all);
+          });
+        });
+      });
+    }
+  };
+})();  
+  
 function start() {
 (function () {
   var app = document.getElementById('app');
@@ -614,30 +690,40 @@ function start() {
     var go = $('go');
     var label = QUAL ? 'Send' : 'Sign in';
     st.sending = true; go.disabled = true; go.textContent = QUAL ? 'Sending…' : 'Signing in…'; err.textContent = '';
-    // Taking a while (Google waking up, or a crowd): say so, so nobody taps again.
     var slow = setTimeout(function () { if (st.sending) go.textContent = 'Still working… hang on'; }, 5000);
     var finish = function () { clearTimeout(slow); st.sending = false; go.disabled = false; go.textContent = label; };
-    google.script.run
-      .withSuccessHandler(function (res) {
-        finish();
-        if (res && res.already) {
-          store.set(doneKey, JSON.stringify({ name: st.person ? st.person.name : '', at: '' }));
-          stop('You\'re already signed in', res.message);
-          return;
-        }
-        if (!res || !res.ok) {
-          if (res && res.expired) { stop('Scan again', res.message); return; }
-          err.textContent = (res && res.message) || 'That didn\'t go through. Tap ' + label + ' again.';
-          return;
-        }
-        store.set(doneKey, JSON.stringify({ name: res.name, at: res.at }));
-        success(res);
-      })
-      .withFailureHandler(function () {
-        finish();
-        err.textContent = 'It didn\'t go through after a few tries. Check your signal and tap ' + label + ' again.';
-      })
-      .ciSubmit(req);
+    // What this screen shows afterwards (the check-in project can't read any of it).
+    var shown = {
+      name: st.person ? st.person.name : ($('gname') ? $('gname').value.trim() : ''),
+      role: ({ officer: 'Attendee', instructor: 'Instructor', roleplayer: 'Role player' })[st.role] || '',
+      title: T.title, qual: !!QUAL,
+      scores: QUAL ? QUAL.courses.filter(function (c) { return req.scores[c.key]; })
+        .map(function (c) { return c.name + ' ' + req.scores[c.key].h + '/' + c.rounds; }) : []
+    };
+    // Lock everything about the officer on this phone. Only the Duty Roster can unlock it.
+    LOCK.seal({ person: req.person || null, guest: req.guest || null, role: req.role, signature: req.signature,
+      certify: req.certify, qual: !!req.qual, scores: req.scores || null }).then(function (sealed) {
+      google.script.run
+        .withSuccessHandler(function (res) {
+          finish();
+          if (!res || !res.ok) {
+            if (res && res.expired) { stop('Scan again', res.message); return; }
+            err.textContent = (res && res.message) || 'That didn\'t go through. Tap ' + label + ' again.';
+            return;
+          }
+          shown.at = res.at;
+          store.set(doneKey, JSON.stringify({ name: shown.name, at: res.at }));
+          success(shown);
+        })
+        .withFailureHandler(function () {
+          finish();
+          err.textContent = 'It didn\'t go through after a few tries. Check your signal and tap ' + label + ' again.';
+        })
+        .ciSubmit({ pass: req.pass, device: req.device, sealed: sealed });
+    }, function () {
+      finish();
+      err.textContent = 'This phone couldn\'t lock your sign-in. Try another browser, or see the supervisor.';
+    });
   }
 
   function success(res) {
@@ -668,16 +754,34 @@ function start() {
   var fallback = { ok: false, dept: 'Chelsea Police Department', patch: 'https://i.imgur.com/Yu7RJhS.png' };
   var go = function (d) { DATA = d || {}; if (!DATA.dept) DATA.dept = fallback.dept; if (!DATA.patch) DATA.patch = fallback.patch; start(); };
   if (!q.get('t')) { fallback.message = "Scan the QR code on the supervisor's screen to sign in."; go(fallback); return; }
+  if (!LOCK.has()) {
+    fallback.message = "This QR code is out of date, or this browser can't open it. Scan the code on the supervisor's screen again.";
+    go(fallback);
+    return;
+  }
   var slow = setTimeout(function () {
     var m = document.querySelector('#app p');
     if (m && !DATA) m.textContent = 'Still loading… hang on a few seconds.';
   }, 4000);
-  api('checkinPage', { t: q.get('t'), k: q.get('k') }).then(function (d) { clearTimeout(slow); go(d); }, function () {
+  api('checkinPage', { t: q.get('t'), k: q.get('k') }).then(function (d) {
+    clearTimeout(slow);
+    if (!d || !d.ok) { go(d); return; }
+    if (!d.box) { fallback.message = "Sign-in is being updated. Ask the supervisor to close and reopen check-in."; go(fallback); return; }
+    return LOCK.open(d.box).then(function (inner) {
+      d.training = inner.training || {};
+      d.people = inner.people || [];
+      d.qual = inner.qual || null;
+      if (inner.certify) d.certify = inner.certify;
+      go(d);
+    }, function () {
+      fallback.message = "This QR code doesn't match this training. Scan the code on the supervisor's screen again.";
+      go(fallback);
+    });
+  }, function () {
     clearTimeout(slow);
     fallback.message = "Couldn't reach the sign-in page. Check your signal, then scan the QR code again.";
     go(fallback);
   });
-})();
 </script>
 </body>
 </html>
