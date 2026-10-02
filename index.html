@@ -14,7 +14,7 @@
 <script>
   (function () {
     var q = location.search || '';
-    location.replace((/[?&]c=/.test(q) ? 'class.html' : 'checkin.html') + q);
+    location.replace((/[?&]c=/.test(q) ? 'class.html' : 'checkin.html') + q + location.hash);
   })();
 </script>
 </head>
