@@ -131,9 +131,26 @@
 // (APP_URL is in config.js).
 var DATA = null;
 var FN = { ciSubmit: 'checkinSubmit', ciClassSignup: 'classSignup', ciClassState: 'classState' };
-function api(name, arg) {
-  return fetch(APP_URL, { method: 'POST', body: JSON.stringify({ pub: name, arg: arg }) })
-    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+// Sends a request to the check-in project. If it fails, times out, or
+// the project says it's busy, it tries again on its own (up to 3 more
+// times). Safe to repeat: the project answers a repeated sign-in with
+// the same result instead of signing in twice.
+function api(name, arg, tries) {
+  tries = tries == null ? 3 : tries;
+  var ctl = window.AbortController ? new AbortController() : null;
+  var timer = ctl ? setTimeout(function () { ctl.abort(); }, 30000) : null;
+  var again = function (e) {
+    if (tries <= 0) throw e;
+    return new Promise(function (ok) { setTimeout(ok, 1500 * (4 - tries)); })
+      .then(function () { return api(name, arg, tries - 1); });
+  };
+  return fetch(APP_URL, { method: 'POST', body: JSON.stringify({ pub: name, arg: arg }), signal: ctl ? ctl.signal : undefined })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function (res) {
+      clearTimeout(timer);
+      if (res && res.ok === false && /lots of people|busy/i.test(res.message || '')) return again(new Error(res.message));
+      return res;
+    }, function (e) { clearTimeout(timer); return again(e); });
 }
 function runner(ok, fail) {
   var r = {
@@ -595,21 +612,30 @@ function start() {
     if (!req.signature) { err.textContent = 'Tap Sign again and sign your name.'; return; }
 
     var go = $('go');
+    var label = QUAL ? 'Send' : 'Sign in';
     st.sending = true; go.disabled = true; go.textContent = QUAL ? 'Sending…' : 'Signing in…'; err.textContent = '';
+    // Taking a while (Google waking up, or a crowd): say so, so nobody taps again.
+    var slow = setTimeout(function () { if (st.sending) go.textContent = 'Still working… hang on'; }, 5000);
+    var finish = function () { clearTimeout(slow); st.sending = false; go.disabled = false; go.textContent = label; };
     google.script.run
       .withSuccessHandler(function (res) {
-        st.sending = false; go.disabled = false; go.textContent = QUAL ? 'Send' : 'Sign in';
+        finish();
+        if (res && res.already) {
+          store.set(doneKey, JSON.stringify({ name: st.person ? st.person.name : '', at: '' }));
+          stop('You\'re already signed in', res.message);
+          return;
+        }
         if (!res || !res.ok) {
           if (res && res.expired) { stop('Scan again', res.message); return; }
-          err.textContent = (res && res.message) || 'That didn\'t go through. Tap Sign in again.';
+          err.textContent = (res && res.message) || 'That didn\'t go through. Tap ' + label + ' again.';
           return;
         }
         store.set(doneKey, JSON.stringify({ name: res.name, at: res.at }));
         success(res);
       })
       .withFailureHandler(function () {
-        st.sending = false; go.disabled = false; go.textContent = QUAL ? 'Send' : 'Sign in';
-        err.textContent = 'No connection. Check your signal and tap Sign in again.';
+        finish();
+        err.textContent = 'It didn\'t go through after a few tries. Check your signal and tap ' + label + ' again.';
       })
       .ciSubmit(req);
   }
@@ -642,7 +668,12 @@ function start() {
   var fallback = { ok: false, dept: 'Chelsea Police Department', patch: 'https://i.imgur.com/Yu7RJhS.png' };
   var go = function (d) { DATA = d || {}; if (!DATA.dept) DATA.dept = fallback.dept; if (!DATA.patch) DATA.patch = fallback.patch; start(); };
   if (!q.get('t')) { fallback.message = "Scan the QR code on the supervisor's screen to sign in."; go(fallback); return; }
-  api('checkinPage', { t: q.get('t'), k: q.get('k') }).then(go, function () {
+  var slow = setTimeout(function () {
+    var m = document.querySelector('#app p');
+    if (m && !DATA) m.textContent = 'Still loading… hang on a few seconds.';
+  }, 4000);
+  api('checkinPage', { t: q.get('t'), k: q.get('k') }).then(function (d) { clearTimeout(slow); go(d); }, function () {
+    clearTimeout(slow);
     fallback.message = "Couldn't reach the sign-in page. Check your signal, then scan the QR code again.";
     go(fallback);
   });
