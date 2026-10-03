@@ -8,22 +8,22 @@
 <script src="config.js"></script>
 <style>
   :root {
-    --navy: #16294A; --gold: #C8A64B; --ink: #13213A; --muted: #5E6A7D; --line: #D5DCE7;
-    --bg: #F2F4F8; --card: #FFFFFF; --ok: #1E7A4C; --err: #B3261E; --focus: #2F5DA8;
+    --navy: #1C3159; --gold: #C8A64B; --ink: #13213A; --muted: #5E6A7D; --line: #D5DCE7;
+    --bg: #EDF1F7; --card: #FFFFFF; --ok: #1E7A4C; --err: #B3261E; --focus: #2F5DA8;
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
   button, input { font: inherit; color: inherit; }
-  .top { background: var(--navy); color: #fff; border-bottom: 3px solid var(--gold); padding: calc(14px + env(safe-area-inset-top)) 16px 14px; }
+  .top { background: var(--bg); color: var(--ink); border-bottom: 1px solid var(--line); padding: calc(12px + env(safe-area-inset-top)) 16px 12px; }
   .top-in { max-width: 560px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
   .top img { width: 44px; height: 44px; object-fit: contain; flex: none; }
-  .top b { display: block; font-size: 17px; }
-  .top span { font-size: 13px; opacity: .8; letter-spacing: .5px; text-transform: uppercase; }
+  .top b { display: block; font-size: 19px; font-weight: 700; color: var(--navy); }
+  .top span { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
   /* Extra room at the bottom: on phones Google's "created by a Google
      Apps Script user" bar can sit over the bottom of the page. */
   main { max-width: 560px; margin: 0 auto; padding: 16px 16px calc(140px + env(safe-area-inset-bottom)); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 0 0 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 0 0 14px; }
   .title { margin: 0; font-size: 22px; line-height: 1.25; color: var(--navy); }
   .meta { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
   .cat { display: inline-block; margin-top: 8px; padding: 2px 8px; border-radius: 6px; background: #E6EBF3; color: var(--navy); font-size: 13px; font-weight: 600; }
@@ -47,7 +47,7 @@
   .drop button:hover, .drop button:focus { background: #EEF2F8; outline: none; }
   .drop small { color: var(--muted); font-size: 14px; white-space: nowrap; }
   .drop .none { padding: 12px; color: var(--muted); font-size: 15px; }
-  .picked { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 8px 8px 14px; border: 1.5px solid var(--navy); border-radius: 12px; background: #F4F7FC; }
+  .picked { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 8px 8px 14px; border: 1.5px solid var(--navy); border-radius: 12px; background: #F3F6FB; }
   .picked div { flex: 1; min-width: 0; }
   .picked b { display: block; }
   .picked small { color: var(--muted); font-size: 14px; }
@@ -63,7 +63,7 @@
 
   .signbtn {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 100%; min-height: 96px;
-    border: 2px dashed var(--navy); border-radius: 12px; background: #F4F7FC; color: var(--navy); font-size: 20px; font-weight: 700; cursor: pointer;
+    border: 2px dashed var(--navy); border-radius: 12px; background: #F3F6FB; color: var(--navy); font-size: 20px; font-weight: 700; cursor: pointer;
   }
   .signbtn small { font-size: 14px; font-weight: 500; color: var(--muted); }
   .sigimg { display: block; width: 100%; max-width: 360px; margin: 0 auto; background: #fff; border: 1px solid var(--line); border-radius: 10px; }
@@ -74,7 +74,7 @@
     touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none;
   }
   .sigov[hidden] { display: none; }
-  .sighead { background: var(--navy); color: #fff; border-bottom: 3px solid var(--gold); padding: calc(12px + env(safe-area-inset-top)) 16px 12px; }
+  .sighead { background: var(--navy); color: #fff; padding: calc(12px + env(safe-area-inset-top)) 16px 12px; }
   .sighead b { display: block; font-size: 19px; }
   .sighead span { font-size: 14px; opacity: .85; }
   .sighead.warn span { color: #FFD479; opacity: 1; font-weight: 700; }
@@ -779,7 +779,7 @@ function start() {
     });
   }, function () {
     clearTimeout(slow);
-   fallback.message = "Couldn't reach the sign-in page. Check your signal, then scan the QR code again.";
+    fallback.message = "Couldn't reach the sign-in page. Check your signal, then scan the QR code again.";
     go(fallback);
   });
 })();
