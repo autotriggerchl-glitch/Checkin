@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Video request - Chelsea Police Department</title>
+<script src="config.js"></script>
+<style>
+  :root {
+    --navy: #1C3159; --gold: #C8A64B; --ink: #13213A; --muted: #5E6A7D; --line: #D5DCE7;
+    --bg: #EDF1F7; --card: #FFFFFF; --ok: #1E7A4C; --err: #B3261E; --focus: #2F5DA8;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+  button, input, textarea { font: inherit; color: inherit; }
+  .top { background: var(--navy); color: #fff; border-bottom: 3px solid var(--gold); padding: calc(12px + env(safe-area-inset-top)) 16px 12px; }
+  .top-in { max-width: 640px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+  .top img { width: 46px; height: 46px; object-fit: contain; flex: none; }
+  .top b { display: block; font-size: 19px; }
+  .top span { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .85; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px 16px calc(60px + env(safe-area-inset-bottom)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 0 0 14px; }
+  h1 { margin: 0 0 6px; font-size: 22px; color: var(--navy); line-height: 1.25; }
+  h2 { margin: 0 0 12px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  p { margin: 0 0 10px; }
+  .note { color: var(--muted); font-size: 15px; }
+  .pick { display: grid; gap: 12px; }
+  .pick button {
+    display: block; width: 100%; padding: 16px; border: 1.5px solid var(--line); border-radius: 14px; background: #fff;
+    text-align: left; cursor: pointer;
+  }
+  .pick button:hover, .pick button:focus-visible { border-color: var(--navy); outline: none; }
+  .pick b { display: block; font-size: 18px; color: var(--navy); }
+  .pick span { display: block; margin-top: 3px; color: var(--muted); font-size: 15px; }
+  label.f { display: block; margin: 0 0 14px; }
+  label.f > span { display: block; margin: 0 0 6px; font-size: 15px; font-weight: 700; }
+  label.f > span i { font-style: normal; font-weight: 500; color: var(--muted); }
+  input[type=text], input[type=email], input[type=tel], input[type=date], input[type=time], textarea {
+    width: 100%; min-height: 50px; padding: 10px 14px; border: 1.5px solid #A3AEBF; border-radius: 12px; background: #fff; font-size: 17px;
+  }
+  textarea { min-height: 96px; resize: vertical; line-height: 1.4; }
+  input:focus, textarea:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px rgba(47, 93, 168, .18); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 420px) { .row2 { grid-template-columns: 1fr; } }
+  .cams { display: grid; gap: 4px; max-height: 280px; overflow-y: auto; margin: 0 0 10px; padding: 6px; border: 1px solid var(--line); border-radius: 12px; }
+  .cams label { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; cursor: pointer; font-size: 16px; }
+  .cams label:hover { background: #EEF2F8; }
+  .cams input { width: 22px; height: 22px; margin: 0; flex: none; accent-color: var(--navy); }
+  .warn { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: #FFF4D6; border: 1px solid #E8C96A; color: #5A4300; font-size: 15px; }
+  .warn:empty { display: none; }
+  .go { display: block; width: 100%; min-height: 56px; border: 0; border-radius: 14px; background: var(--navy); color: #fff; font-size: 18px; font-weight: 700; cursor: pointer; }
+  .go:disabled { opacity: .6; }
+  .back { border: 0; background: none; color: var(--focus); font-weight: 600; padding: 8px 0; margin: 0 0 8px; cursor: pointer; font-size: 15px; }
+  .err { color: var(--err); font-weight: 600; min-height: 1.4em; margin: 10px 2px 0; }
+  .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  .done { text-align: center; padding: 28px 18px; }
+  .done .mark { width: 76px; height: 76px; margin: 0 auto 12px; border-radius: 50%; background: var(--ok); display: grid; place-items: center; }
+  .done h1 { color: var(--ok); }
+  .ref { display: inline-block; margin: 6px 0 10px; padding: 6px 12px; border-radius: 8px; background: #E6EBF3; font: 700 18px "Courier New", monospace; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <img id="patch" alt="" hidden>
+  <div><span>Video request</span><b>Chelsea Police Department</b></div>
+</div></header>
+<main id="app"><p style="text-align:center;color:#5E6A7D;padding:40px 0">Loading…</p></main>
+
+<script>
+// ---------- Locking (must match drRecOpen_ in Records.gs) ----------
+// SEAL-START
+function recSeal(obj, jwk) {
+  var S = crypto.subtle, enc = new TextEncoder();
+  function hk(raw) { return S.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']); }
+  function mac(k, m) { return S.sign('HMAC', k, m).then(function (b) { return new Uint8Array(b); }); }
+  function b64(u) { var s = ''; for (var i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
+  var K = crypto.getRandomValues(new Uint8Array(32));
+  var nonce = crypto.getRandomValues(new Uint8Array(16));
+  var pt = enc.encode(JSON.stringify(obj));
+  var wrapped;
+  return S.importKey('jwk', jwk, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt'])
+    .then(function (pub) { return S.encrypt({ name: 'RSA-OAEP' }, pub, K); })
+    .then(function (w) { wrapped = new Uint8Array(w); return hk(K); })
+    .then(function (kk) { return Promise.all([mac(kk, enc.encode('enc')), mac(kk, enc.encode('mac'))]); })
+    .then(function (r) { return Promise.all([hk(r[0]), hk(r[1])]); })
+    .then(function (keys) {
+      var jobs = [];
+      for (var b = 0; b < Math.ceil(pt.length / 32); b++) {
+        var m = new Uint8Array(20);
+        m.set(nonce, 0);
+        m[16] = (b >>> 24) & 255; m[17] = (b >>> 16) & 255; m[18] = (b >>> 8) & 255; m[19] = b & 255;
+        jobs.push(mac(keys[0], m));
+      }
+      return Promise.all(jobs).then(function (ks) {
+        var ct = new Uint8Array(pt.length);
+        for (var i = 0; i < pt.length; i++) ct[i] = pt[i] ^ ks[i >> 5][i & 31];
+        var body = new Uint8Array(16 + ct.length);
+        body.set(nonce, 0); body.set(ct, 16);
+        return mac(keys[1], body).then(function (tag) {
+          var all = new Uint8Array(body.length + 32);
+          all.set(body, 0); all.set(tag, body.length);
+          return { w: b64(wrapped), box: b64(all) };
+        });
+      });
+    });
+}
+// SEAL-END
+
+// Sends a request to the check-in project, trying again on a dropped
+// connection. A repeated send has the same id, so it's only saved once.
+function api(name, arg, tries) {
+  tries = tries == null ? 3 : tries;
+  var again = function (e) {
+    if (tries <= 0) throw e;
+    return new Promise(function (ok) { setTimeout(ok, 1500 * (4 - tries)); }).then(function () { return api(name, arg, tries - 1); });
+  };
+  return fetch(APP_URL, { method: 'POST', body: JSON.stringify({ pub: name, arg: arg }) })
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function (res) {
+      if (res && res.ok === false && /lots of requests|busy/i.test(res.message || '')) return again(new Error(res.message));
+      return res;
+    }, again);
+}
+
+(function () {
+  var app = document.getElementById('app');
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+  };
+  var CFG = null, TYPE = '', sending = false;
+  var device = '';
+  try { device = localStorage.getItem('rq-device') || ''; if (!device) { device = Date.now().toString(36) + Math.random().toString(36).slice(2, 10); localStorage.setItem('rq-device', device); } } catch (e) {}
+  var rid = '';
+
+  function stop(title, msg) {
+    app.innerHTML = '<div class="card"><h1>' + esc(title) + '</h1><p class="note">' + esc(msg) + '</p></div>';
+  }
+  function todayKey() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+
+  if (!window.crypto || !crypto.subtle || !window.fetch || typeof APP_URL === 'undefined') {
+    stop('This browser can\'t send the request', 'Please try a current version of Chrome, Safari, Edge or Firefox.');
+    return;
+  }
+
+  api('recordsPage', {}).then(function (d) {
+    if (d && d.patch) { var img = $('patch'); img.src = d.patch; img.hidden = false; img.onerror = function () { img.hidden = true; }; }
+    if (!d || !d.ok) { stop('Video requests', (d && d.message) || 'Online requests aren\'t available right now.'); return; }
+    CFG = d;
+    choose();
+  }, function () {
+    stop('Couldn\'t load the request form', 'Check your connection, then reload this page.');
+  });
+
+  function choose() {
+    TYPE = '';
+    app.innerHTML =
+      '<div class="card"><h1>Request video</h1>' +
+        '<p class="note">Use this form to ask the Chelsea Police Department for video. You\'ll get an email with a ticket number, ' +
+          'and updates as your request is worked on.</p></div>' +
+      '<div class="card"><h2>What video do you need?</h2><div class="pick">' +
+        '<button type="button" data-t="camera"><b>City camera footage</b><span>Street and public cameras run by the City. ' +
+          'Kept for ' + esc(CFG.cameraDays) + ' days, so ask soon.</span></button>' +
+        '<button type="button" data-t="bwc"><b>Body camera footage</b><span>Video from a police officer\'s body-worn camera.</span></button>' +
+      '</div></div>';
+    app.querySelectorAll('[data-t]').forEach(function (b) { b.onclick = function () { form(b.getAttribute('data-t')); }; });
+  }
+
+  function field(id, label, input, opt) {
+    return '<label class="f"><span>' + label + (opt ? ' <i>(optional)</i>' : '') + '</span>' + input + '</label>';
+  }
+  function text(id, type, extra) { return '<input type="' + (type || 'text') + '" id="' + id + '" ' + (extra || '') + '>'; }
+
+  function form(type) {
+    TYPE = type;
+    rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+    var cam = type === 'camera';
+    var cams = (CFG.cameras || []);
+    app.innerHTML =
+      '<button type="button" class="back" id="back">‹ Choose a different kind of video</button>' +
+      '<div class="card"><h1>' + (cam ? 'City camera footage' : 'Body camera footage') + '</h1>' +
+        '<p class="note">Fields marked optional can be left blank. Everything else is needed.</p></div>' +
+
+      '<div class="card"><h2>About you</h2>' +
+        field('nm', 'First and last name', text('nm', 'text', 'autocomplete="name" maxlength="100"')) +
+        field('em', 'Email', text('em', 'email', 'autocomplete="email" maxlength="120" inputmode="email"')) +
+        field('ph', 'Phone number', text('ph', 'tel', 'autocomplete="tel" maxlength="40"'), true) +
+      '</div>' +
+
+      '<div class="card"><h2>The incident</h2>' +
+        field('dt', 'Date of the incident', text('dt', 'date', 'max="' + todayKey() + '" min="2000-01-01"')) +
+        '<p class="warn" id="old"></p>' +
+        (cam
+          ? '<div class="row2">' + field('t1', 'About what time did it start?', text('t1', 'time')) +
+              field('t2', 'About what time did it end?', text('t2', 'time')) + '</div>' +
+            (cams.length ? '<label class="f"><span>Which cameras? <i>(check any that apply)</i></span></label><div class="cams">' +
+              cams.map(function (c, i) { return '<label><input type="checkbox" data-cam="' + i + '"> ' + esc(c) + '</label>'; }).join('') + '</div>' : '') +
+            field('loc', cams.length ? 'Location, or another camera not listed' : 'Location (street address or intersection)',
+              '<textarea id="loc" maxlength="600"></textarea>', !!cams.length)
+          : field('t1', 'About what time?', text('t1', 'time')) +
+            field('of', 'Officer\'s name and badge number, if known', text('of', 'text', 'maxlength="200"'), true)) +
+        field('cs', 'Police incident, arrest, accident or call number', text('cs', 'text', 'maxlength="60" placeholder="Leave blank if you don\'t have one"'), true) +
+        field('sb', cam ? 'Name of the defendant, victim or suspect' : 'Name of the person involved', text('sb', 'text', 'maxlength="200"'), true) +
+      '</div>' +
+
+      '<div class="card"><h2>Your request</h2>' +
+        field('rs', 'Why do you need this video?', '<textarea id="rs" maxlength="1500" placeholder="For example: insurance claim, court case, I was in the accident"></textarea>') +
+        field('rm', 'Anything else that helps us find it', '<textarea id="rm" maxlength="2500" placeholder="For example: direction of travel, vehicle color and make, what you were wearing"></textarea>', true) +
+        '<div class="hp" aria-hidden="true"><label>Leave this empty <input type="text" id="hp" tabindex="-1" autocomplete="off"></label></div>' +
+      '</div>' +
+
+      '<button type="button" class="go" id="go">Send request</button>' +
+      '<p class="err" id="err" role="alert"></p>';
+
+    $('back').onclick = choose;
+    $('go').onclick = send;
+    $('dt').addEventListener('change', checkOld);
+    app.addEventListener('input', function () { $('err').textContent = ''; });
+    window.scrollTo(0, 0);
+  }
+
+  // City camera footage older than the keep time may be gone.
+  function checkOld() {
+    var el = $('old');
+    if (!el) return;
+    el.textContent = '';
+    if (TYPE !== 'camera' || !$('dt').value) return;
+    var m = $('dt').value.split('-'), d = new Date(+m[0], +m[1] - 1, +m[2]);
+    var days = Math.floor((new Date() - d) / 86400000);
+    if (days > CFG.cameraDays) {
+      el.textContent = 'City camera footage is kept for ' + CFG.cameraDays + ' days. This date is ' + days +
+        ' days ago, so the footage may already be gone. You can still send the request and we\'ll check.';
+    }
+  }
+
+  function val(id) { var el = $(id); return el ? String(el.value || '').trim() : ''; }
+
+  function send() {
+    if (sending) return;
+    var err = $('err'), cam = TYPE === 'camera';
+    var picked = [].filter.call(app.querySelectorAll('[data-cam]'), function (c) { return c.checked; })
+      .map(function (c) { return CFG.cameras[+c.getAttribute('data-cam')]; });
+    var date = val('dt'), t1 = val('t1'), t2 = val('t2');
+    var problem =
+      !/\S+\s+\S+/.test(val('nm')) ? 'Type your first and last name.' :
+      !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(val('em')) ? 'Type your email address. We send your ticket number there.' :
+      !date ? 'Pick the date of the incident.' :
+      date > todayKey() ? 'The incident date can\'t be in the future.' :
+      !t1 ? (cam ? 'Pick about what time it started.' : 'Pick about what time it happened.') :
+      cam && !t2 ? 'Pick about what time it ended.' :
+      cam && !picked.length && !val('loc') ? 'Tell us where it happened.' :
+      !val('rs') ? 'Tell us why you need this video.' : '';
+    if (problem) { err.textContent = problem; return; }
+
+    // Ends after midnight: that's the next day.
+    var endDate = date;
+    if (cam && t2 < t1) {
+      var m = date.split('-'), n = new Date(+m[0], +m[1] - 1, +m[2] + 1);
+      endDate = n.getFullYear() + '-' + ('0' + (n.getMonth() + 1)).slice(-2) + '-' + ('0' + n.getDate()).slice(-2);
+    }
+    var location = picked.concat(val('loc') ? [val('loc')] : []).join('\n');
+    var req = {
+      v: 1, type: TYPE, name: val('nm'), email: val('em'), phone: val('ph'),
+      start: date + ' ' + t1, end: cam ? endDate + ' ' + t2 : '',
+      location: cam ? location : '', officer: cam ? '' : val('of'),
+      caseNo: val('cs'), subject: val('sb'), reason: val('rs'), remarks: val('rm')
+    };
+
+    var go = $('go');
+    sending = true; go.disabled = true; go.textContent = 'Sending…'; err.textContent = '';
+    var slow = setTimeout(function () { if (sending) go.textContent = 'Still sending… hang on'; }, 5000);
+    var fin = function () { clearTimeout(slow); sending = false; go.disabled = false; go.textContent = 'Send request'; };
+    recSeal(req, CFG.key).then(function (sealed) {
+      return api('recordsSubmit', { w: sealed.w, box: sealed.box, rid: rid, device: device, hp: val('hp') });
+    }).then(function (res) {
+      fin();
+      if (!res || !res.ok) { err.textContent = (res && res.message) || 'That didn\'t go through. Tap Send request again.'; return; }
+      done(res.ref, req.email);
+    }, function () {
+      fin();
+      err.textContent = 'It didn\'t go through. Check your connection and tap Send request again.';
+    });
+  }
+
+  function done(ref, email) {
+    app.innerHTML = '<div class="card done">' +
+      '<div class="mark"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>' +
+      '<h1>Request sent</h1>' +
+      '<p>Your reference:</p><div class="ref">' + esc(ref) + '</div>' +
+      '<p>Within a few minutes you\'ll get an email at <b>' + esc(email) + '</b> with your ticket number. ' +
+        'If you don\'t see it, check your spam or junk folder.</p>' +
+      '<p class="note">You can close this page.</p></div>';
+    window.scrollTo(0, 0);
+  }
+})();
+</script>
+</body>
+</html>
