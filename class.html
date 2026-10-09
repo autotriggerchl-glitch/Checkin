@@ -110,6 +110,15 @@
   .pinf input[type=password] { letter-spacing: 8px; font-weight: 700; }
   .pin-err { color: var(--err); font-weight: 600; min-height: 1.3em; margin: 10px 0 0; font-size: 15px; }
   .pinbtns { display: flex; gap: 10px; margin-top: 12px; }
+  .sortbar { display: flex; gap: 4px; margin: 0 0 12px; padding: 4px; border-radius: 12px; background: #E1E7F0; }
+  .sortbar button { flex: 1; min-height: 42px; border: 0; border-radius: 9px; background: none; color: var(--muted); font-size: 15px; font-weight: 700; cursor: pointer; }
+  .sortbar button.on { background: #fff; color: var(--navy); box-shadow: 0 1px 4px rgba(19, 33, 58, .15); }
+  .dtopic { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 2px; }
+  .dtopic em { font-style: normal; font-size: 13px; font-weight: 700; padding: 2px 9px; border-radius: 6px; background: #E6EBF3; color: var(--navy); }
+  .dtopic .have { font-size: 13px; font-weight: 700; color: var(--ok); }
+  .daygap { margin: 16px 2px 8px; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  .swfrom { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: #F3F6FB; font-size: 16px; line-height: 1.5; }
+  .swfrom s { color: var(--muted); }
   .saving { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 12px; z-index: 25; padding: 5px 12px; border-radius: 999px;
     background: #fff; color: var(--navy); font-size: 13px; font-weight: 700; box-shadow: 0 4px 14px rgba(19, 33, 58, .2); }
   .saving.retry { color: var(--err); }
@@ -179,6 +188,8 @@ function start() {
   var device = store.get('ci-device');
   if (!device) { device = String(Date.now()) + Math.random().toString(36).slice(2, 10); store.set('ci-device', device); }
   var meKey = 'ci-class-me-' + DATA.c;
+  // In-Service: list the dates by topic (default) or all by date. Remembered on this phone.
+  var sortBy = store.get('ci-class-sort') === 'date' ? 'date' : 'topic';
 
   var st = { cls: DATA.cls, today: DATA.today, me: null, matches: [], busy: '', confirm: '', confirmTimer: null };
 
@@ -196,7 +207,7 @@ function start() {
     if (!d || !d.ok || st.sending || st.queue.length) return;
     st.cls = d.cls; st.today = d.today || st.today;
     PEOPLE = peopleOf(st.cls.people);
-    if (!(document.activeElement && document.activeElement.id === 'q') && !($('pinov') && !$('pinov').hidden)) render();
+    if (!(document.activeElement && document.activeElement.id === 'q') && !($('pinov') && !$('pinov').hidden) && !($('swov') && !$('swov').hidden)) render();
   };
   window.ciGone = function (m) { stop('Class sign-up', m); };
 
@@ -286,7 +297,23 @@ function start() {
     // Days this officer already has, by topic (for "you're in X that day").
     var busyDays = {};
     if (isIS() && st.me) c.dates.forEach(function (d) { if (d['in'].some(isMe)) busyDays[d.date] = d.topic; });
-    groups.forEach(function (g) {
+    if (isIS()) {
+      html += '<div class="sortbar" role="group" aria-label="Show dates">' +
+        '<button type="button" data-sort="topic" class="' + (sortBy === 'topic' ? 'on' : '') + '" aria-pressed="' + (sortBy === 'topic') + '">By topic</button>' +
+        '<button type="button" data-sort="date" class="' + (sortBy === 'date' ? 'on' : '') + '" aria-pressed="' + (sortBy === 'date') + '">By date</button></div>';
+    }
+    if (isIS() && sortBy === 'date') {
+      // Every date in order, each showing its topic.
+      var all = c.dates.filter(function (d) { return d.date >= st.today || myStatus(d.topic).seat === d; })
+        .slice().sort(function (a, b) { return (a.date + (a.start || '')).localeCompare(b.date + (b.start || '')); });
+      var lastMonth = '';
+      all.forEach(function (d) {
+        var mon = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][+d.date.slice(5, 7) - 1];
+        if (mon !== lastMonth) { html += '<p class="daygap">' + esc(mon) + '</p>'; lastMonth = mon; }
+        html += dateCard(d, myStatus(d.topic), closed, busyDays[d.date] && busyDays[d.date] !== d.topic ? busyDays[d.date] : '', true);
+      });
+      if (!all.length) html += '<p class="note">No upcoming dates.</p>';
+    } else groups.forEach(function (g) {
       var m = myStatus(g);
       if (isIS()) html += '<h3 class="topic">' + esc(g) + '<span class="' + (m.seat ? 'ok">' + esc(shortDay(m.seat.date)) : 'need">' + (st.me ? 'Not picked' : '')) + '</span></h3>';
       // Dates already past aren't shown (unless this officer is on one).
@@ -301,14 +328,17 @@ function start() {
 
   function clock(d) { return ('0' + d.getHours()).slice(-2) + ('0' + d.getMinutes()).slice(-2); }
 
-  function dateCard(d, mine, closed, also) {
+  function dateCard(d, mine, closed, also, showTopic) {
     var taken = d['in'].length, left = d.seats - taken, past = d.date < st.today;
     var seatHere = mine.seat === d, waitHere = mine.wait && mine.wait.d === d;
     var chip = past ? '<span class="seats past">Past</span>'
       : left <= 0 ? '<span class="seats full">Full' + (d.wait.length ? ' · ' + d.wait.length + ' waiting' : '') + '</span>'
       : '<span class="seats">' + left + (left === 1 ? ' seat' : ' seats') + ' left</span>';
     var html = '<div class="card date' + (seatHere ? ' me' : waitHere ? ' mewait' : '') + '">' +
-      '<div class="dhead"><div><b>' + esc(day(d.date)) + '</b><small>' + esc([times(d), d.location].filter(Boolean).join(' · ')) +
+      '<div class="dhead"><div>' +
+        (showTopic ? '<p class="dtopic"><em>' + esc(d.topic) + '</em>' +
+          (mine.seat && mine.seat !== d ? '<span class="have">\u2713 You have it ' + esc(shortDay(mine.seat.date)) + '</span>' : '') + '</p>' : '') +
+        '<b>' + esc(day(d.date)) + '</b><small>' + esc([times(d), d.location].filter(Boolean).join(' · ')) +
         '</small><small>' + taken + ' of ' + d.seats + ' signed up</small>' +
         (also && !seatHere ? '<small style="color:var(--wait);font-weight:700">You\'re in ' + esc(also) + ' that day.</small>' : '') + '</div>' + chip + '</div>' +
       '<div class="bar"><i style="width:' + Math.min(100, Math.round(taken / d.seats * 100)) + '%"></i></div>';
@@ -337,9 +367,7 @@ function start() {
           '<button type="button" class="drop-link" data-op="unwait" data-d="' + d.id + '">Leave the waitlist</button>';
       } else if (left > 0) {
         var sw = !!mine.seat;
-        b = st.confirm === confirmKey('join') && sw
-          ? '<button type="button" class="btn" data-op="join" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>Tap again to switch from ' + esc(shortDay(mine.seat.date)) + '</button>'
-          : '<button type="button" class="btn" data-op="join" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>' +
+        b = '<button type="button" class="btn' + (sw ? ' ghost' : '') + '" data-op="join" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>' +
               (busy ? 'Saving…' : sw ? 'Switch to this date' : 'Sign up for this date') + '</button>';
       } else {
         b = '<button type="button" class="btn ghost" data-op="wait" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>' +
@@ -423,8 +451,11 @@ function start() {
   function act(op, dateId) {
     var dd = st.cls.dates.filter(function (x) { return x.id === dateId; })[0] || {};
     var mine = myStatus(isIS() ? dd.topic : '');
-    // Dropping out, or switching away from a seat, takes a second tap.
-    var needs = op === 'drop' || (op === 'join' && mine.seat);
+    // Switching away from a seat: a pop-up asks first.
+    if (op === 'join' && mine.seat && mine.seat !== dd && !st.switchOk) { switchAsk(mine.seat, dd); return; }
+    st.switchOk = false;
+    // Dropping out takes a second tap.
+    var needs = op === 'drop';
     if (needs && st.confirm !== op + '|' + dateId) {
       st.confirm = op + '|' + dateId;
       clearTimeout(st.confirmTimer);
@@ -571,6 +602,34 @@ function start() {
     if (st.queue.length) { e.preventDefault(); e.returnValue = ''; }
   });
 
+  // ---------- Are you sure you want to switch? ----------
+  function switchAsk(from, to) {
+    var ov = $('swov');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'swov'; ov.className = 'pinov';
+      ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'sw-t');
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('button');
+        if (e.target === ov || (b && b.id === 'sw-keep')) { ov.hidden = true; render(); return; }
+        if (b && b.id === 'sw-go') { ov.hidden = true; st.switchOk = true; act('join', ov.dataset.d); }
+      });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !ov.hidden) { ov.hidden = true; render(); } });
+    }
+    var when = function (d) { return shortDay(d.date) + (times(d) ? ' ' + times(d) : ''); };
+    var what = isIS() ? esc(to.topic) : 'your date';
+    ov.dataset.d = to.id;
+    ov.innerHTML = '<div class="pincard">' +
+      '<h2 class="pint" id="sw-t">Switch ' + what + '?</h2>' +
+      '<p class="swfrom">From <s>' + esc(when(from)) + '</s><br>To <b>' + esc(when(to)) + '</b></p>' +
+      '<p class="note" style="margin:10px 0 0">You\'ll give up your seat on ' + esc(shortDay(from.date)) + ', and someone else can take it.</p>' +
+      '<div class="pinbtns"><button type="button" class="btn ghost" id="sw-keep">Keep ' + esc(shortDay(from.date)) + '</button>' +
+        '<button type="button" class="btn" id="sw-go">Switch</button></div></div>';
+    ov.hidden = false;
+    setTimeout(function () { var k = $('sw-keep'); if (k) k.focus(); }, 50);
+  }
+
   // ---------- In-Service PIN ----------
   // mode: new (email + make up a PIN), need / wrong (enter the PIN),
   // locked (too many tries). after = the change to send once it's in.
@@ -666,6 +725,7 @@ function start() {
     if (b.id === 'refresh') { refresh(false); return; }
     if (b.id === 'forget') { savePass(''); st.pin = ''; render(); toast('This phone forgot your PIN.'); return; }
     if (b.dataset.op) { act(b.dataset.op, b.dataset.d); return; }
+    if (b.dataset.sort) { sortBy = b.dataset.sort; store.set('ci-class-sort', sortBy); render(); return; }
   });
   app.addEventListener('input', function (e) { if (e.target.id === 'q') drawDrop(); });
   app.addEventListener('keydown', function (e) {
