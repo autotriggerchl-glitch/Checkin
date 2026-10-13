@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="My training">
+<meta name="theme-color" content="#EDF1F7">
+<title>My training</title>
+<script src="config.js"></script>
+<style>
+  :root {
+    --navy: #1C3159; --ink: #13213A; --muted: #5E6A7D; --line: #D5DCE7;
+    --bg: #EDF1F7; --card: #FFFFFF; --ok: #1E7A4C; --okbg: #E5F3EB; --err: #B3261E; --errbg: #FBEAE9;
+    --wait: #7A5200; --waitbg: #FFF4D6; --focus: #2F5DA8;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+  button, input { font: inherit; color: inherit; }
+  .top { background: var(--bg); border-bottom: 1px solid var(--line); padding: calc(12px + env(safe-area-inset-top)) 16px 12px; }
+  .top-in { max-width: 560px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+  .top img { width: 44px; height: 44px; object-fit: contain; flex: none; }
+  .top b { display: block; font-size: 19px; font-weight: 700; color: var(--navy); }
+  .top span { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+  main { max-width: 560px; margin: 0 auto; padding: 16px 16px calc(60px + env(safe-area-inset-bottom)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 0 0 14px; }
+  h2 { margin: 22px 2px 10px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  h2 em { font-style: normal; padding: 1px 8px; border-radius: 999px; background: #E1E7F0; color: var(--navy); letter-spacing: 0; }
+  h1 { margin: 0 0 6px; font-size: 21px; color: var(--navy); }
+  .note { color: var(--muted); font-size: 15px; margin: 0; }
+  .err { color: var(--err); font-weight: 600; font-size: 15px; min-height: 1.3em; margin: 10px 0 0; }
+  .link { border: 0; background: none; color: var(--focus); font-weight: 600; padding: 8px 2px; cursor: pointer; font-size: 15px; }
+  .btn { min-height: 50px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--navy); color: #fff; font-size: 17px; font-weight: 700; cursor: pointer; width: 100%; }
+  .btn.ghost { background: #fff; color: var(--navy); border: 1.5px solid var(--navy); }
+  .btn:disabled { opacity: .55; }
+  .field { display: block; margin: 12px 0 0; }
+  .field span { display: block; font-size: 14px; font-weight: 700; margin: 0 0 4px; }
+  input[type=text], input[type=email], input[type=password] {
+    width: 100%; min-height: 50px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; font-size: 17px; }
+  input:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px rgba(47, 93, 168, .18); }
+  input[type=password] { letter-spacing: 8px; font-weight: 700; font-size: 20px; }
+  .find { position: relative; }
+  .drop { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5; margin: 0; padding: 4px; list-style: none;
+    background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 28px rgba(19, 33, 58, .16); }
+  .drop[hidden] { display: none; }
+  .drop button { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px; min-height: 50px; padding: 6px 12px; border: 0; border-radius: 9px; background: none; text-align: left; cursor: pointer; }
+  .drop button:hover, .drop button:focus { background: #EEF2F8; outline: none; }
+  .drop small { color: var(--muted); font-size: 14px; }
+  .drop .none { padding: 12px; color: var(--muted); font-size: 15px; }
+  .me { display: flex; align-items: center; gap: 12px; }
+  .me .av { flex: none; width: 46px; height: 46px; border-radius: 50%; background: var(--navy); color: #fff; display: grid; place-items: center; font-weight: 800; }
+  .me div { flex: 1; min-width: 0; }
+  .me b { display: block; font-size: 18px; }
+  .me small { color: var(--muted); font-size: 14px; }
+  .me-acts { display: flex; gap: 16px; margin-top: 6px; }
+  a.cls { display: block; text-decoration: none; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin: 0 0 12px; }
+  a.cls:active { background: #F3F6FB; }
+  a.cls.mine { border: 2px solid var(--ok); }
+  .ct { display: flex; align-items: flex-start; gap: 10px; }
+  .ct b { flex: 1; font-size: 18px; color: var(--navy); line-height: 1.25; }
+  .ct .chev { color: var(--muted); font-size: 22px; line-height: 1; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
+  .tag { padding: 2px 8px; border-radius: 6px; background: #E6EBF3; color: var(--navy); font-size: 13px; font-weight: 600; }
+  .tag.ok { background: var(--okbg); color: var(--ok); }
+  .tag.wait { background: var(--waitbg); color: var(--wait); }
+  .tag.closed { background: var(--errbg); color: var(--err); }
+  .when { margin: 8px 0 0; font-size: 15px; color: var(--muted); }
+  .mylist { margin: 8px 0 0; padding: 0; list-style: none; }
+  .mylist li { display: flex; gap: 8px; padding: 6px 0; border-top: 1px solid #EEF1F5; font-size: 15px; }
+  .mylist li:first-child { border-top: 0; }
+  .mylist li b { min-width: 108px; color: var(--ink); }
+  .mylist li.w { color: var(--wait); }
+  .empty { text-align: center; color: var(--muted); padding: 18px 8px; font-size: 15px; }
+  .foot { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .ov { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; justify-content: center; background: rgba(19, 33, 58, .5); padding: 12px; }
+  .ov[hidden] { display: none; }
+  @media (min-height: 600px) { .ov { align-items: center; } }
+  .ov .card { width: 100%; max-width: 480px; margin: 0; }
+  .btns { display: flex; gap: 10px; margin-top: 14px; }
+  .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 40;
+    max-width: calc(100% - 32px); padding: 12px 16px; border-radius: 12px; background: var(--ink); color: #fff; font-size: 15px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
+  .toast.bad { background: var(--err); }
+  .toast[hidden] { display: none; }
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <img id="patch" alt="" hidden>
+  <div><span>My training</span><b id="dept">Chelsea Police Department</b></div>
+</div></header>
+<main id="app"><p class="empty">Loading…</p></main>
+<div class="ov" id="pinov" role="dialog" aria-modal="true" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+// My training: sign in once with your class PIN, then see the classes
+// you're signed up for and the ones open to you. Tapping a class opens
+// its sign-up page (class.html), already signed in on this phone.
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var app = $('app');
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { if (v === '' || v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+  };
+  function api(name, arg) {
+    return fetch(APP_URL, { method: 'POST', body: JSON.stringify({ pub: name, arg: arg || {} }) })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+  }
+  // Shared with the class sign-up page: who's on this phone, and their pass.
+  function meSaved() { try { return JSON.parse(store.get('ci-class-me') || 'null'); } catch (e) { return null; } }
+  function passes() { try { return JSON.parse(store.get('ci-pass') || '{}') || {}; } catch (e) { return {}; } }
+  function passFor(me) { return me ? passes()[me.name + '|' + me.call] || '' : ''; }
+  function savePass(me, token) { var all = passes(), k = me.name + '|' + me.call; if (token) all[k] = token; else delete all[k]; store.set('ci-pass', JSON.stringify(all)); }
+
+  var st = { people: null, me: meSaved(), data: null, step: '', matches: [], busy: false, err: '' };
+  try { st.data = JSON.parse(store.get('ci-my-classes') || 'null'); } catch (e) {}
+  if (st.data && (!st.me || st.data.me.name !== st.me.name)) st.data = null;
+
+  var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  function md(s) { var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? DOW[new Date(+m[1], +m[2] - 1, +m[3]).getDay()] + ' ' + (+m[2]) + '/' + (+m[3]) : s; }
+  function times(d) { return d.start ? d.start + (d.end ? '-' + d.end : '') : ''; }
+  function initials(n) { var w = String(n || '').replace(/^(Lt|Sgt|Capt|Chief|Det|Ofc)\.?\s+/i, '').split(/\s+/).filter(Boolean); return ((w[0] || '?')[0] + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase(); }
+  var toastT = null;
+  function toast(m, bad) { var t = $('toast'); t.textContent = m; t.className = 'toast' + (bad ? ' bad' : ''); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, bad ? 6000 : 3500); }
+
+  // ---------- Start ----------
+  if (st.me && passFor(st.me)) { render(); loadClasses(); } else { st.step = 'who'; render(); }
+  api('myPeople').then(function (res) {
+    if (!res || !res.ok) return;
+    st.people = res.people.map(function (p) {
+      var words = String(p[0]).toLowerCase().split(/[\s.,'-]+/).filter(Boolean);
+      return { name: p[0], call: p[1] || '', rank: p[2] || '', words: words, last: words[words.length - 1] || '' };
+    }).sort(function (a, b) { return (a.last + a.name).localeCompare(b.last + b.name); });
+    if (res.patch) { var img = $('patch'); img.src = res.patch; img.hidden = false; img.onerror = function () { img.hidden = true; }; }
+    if (st.step === 'who') render();
+  }, function () { if (st.step === 'who') { st.err = 'Couldn\'t reach the training system. Check your signal and reload.'; render(); } });
+
+  function loadClasses(quiet) {
+    if (!st.me) return;
+    api('myClasses', { name: st.me.name, call: st.me.call, token: passFor(st.me) }).then(function (res) {
+      if (res && res.ok) { st.data = res; store.set('ci-my-classes', JSON.stringify(res)); render(); if (!quiet) {} return; }
+      if (res && res.pin) { savePass(st.me, ''); st.data = null; st.step = 'pin'; st.err = ''; render(); return; }
+      if (res && res.gone) { st.data = null; st.step = 'who'; st.err = res.message; render(); return; }
+      if (!quiet) toast((res && res.message) || 'That didn\'t load.', true);
+    }, function () { if (!quiet) toast('Couldn\'t load your classes. Check your signal.', true); });
+  }
+
+  // ---------- Screens ----------
+  function render() {
+    if (st.step === 'who') return renderWho();
+    if (st.step === 'pin' || st.step === 'new') return renderPin();
+    if (!st.data) { app.innerHTML = '<p class="empty">Loading your classes…</p>'; return; }
+    var d = st.data, me = d.me;
+    var mine = d.classes.filter(function (c) { return c.seats.length || c.waits.length; });
+    var open = d.classes.filter(function (c) { return !c.seats.length && !c.waits.length; });
+    app.innerHTML =
+      '<div class="card"><div class="me"><span class="av">' + esc(initials(me.name)) + '</span><div><b>' + esc(me.name) + '</b><small>' + esc([me.call, d.email].filter(Boolean).join(' · ')) + '</small>' +
+        '<div class="me-acts"><button type="button" class="link" id="chpin">Change PIN</button><button type="button" class="link" id="out">Sign out</button></div></div></div></div>' +
+      '<h2>My classes <em>' + mine.length + '</em></h2>' +
+      (mine.length ? mine.map(card).join('') : '<p class="empty">You aren\'t signed up for anything yet.</p>') +
+      '<h2>Open for sign-up <em>' + open.length + '</em></h2>' +
+      (open.length ? open.map(card).join('') : '<p class="empty">Nothing else is open to you right now.</p>') +
+      '<div class="foot"><span>To change your email, contact the training coordinator.</span><button type="button" class="link" id="refresh">Refresh</button></div>';
+    $('chpin').onclick = openChangePin;
+    $('out').onclick = function () { savePass(st.me, ''); store.set('ci-my-classes', ''); st.data = null; st.step = 'who'; st.err = ''; render(); };
+    $('refresh').onclick = function () { loadClasses(); toast('Up to date.'); };
+  }
+
+  function card(c) {
+    var url = 'class.html?c=' + encodeURIComponent(c.c) + '&k=' + encodeURIComponent(c.k);
+    var range = c.first ? (c.first === c.last ? md(c.first) : md(c.first) + ' – ' + md(c.last)) : '';
+    var isIS = c.kind === 'inservice', have = {};
+    c.seats.forEach(function (s) { if (s.topic) have[s.topic] = 1; });
+    var tags = [];
+    if (c.category) tags.push('<span class="tag">' + esc(c.category) + '</span>');
+    if (c.practice) tags.push('<span class="tag">Practice</span>');
+    if (isIS) {
+      var n = c.topics.filter(function (t) { return have[t]; }).length;
+      tags.push('<span class="tag ' + (n === c.topics.length ? 'ok' : n ? 'wait' : '') + '">' + n + ' of ' + c.topics.length + ' topics</span>');
+    } else if (c.seats.length) tags.push('<span class="tag ok">✓ Signed up</span>');
+    if (c.waits.length) tags.push('<span class="tag wait">Waitlist</span>');
+    if (c.closed) tags.push('<span class="tag closed">Closed</span>');
+    else if (!c.seats.length && !c.waits.length) tags.push('<span class="tag' + (c.seatsLeft ? ' ok' : ' closed') + '">' + (c.seatsLeft ? c.seatsLeft + (c.seatsLeft === 1 ? ' seat' : ' seats') + ' left' : 'Full: waitlist') + '</span>');
+    var lines = c.seats.map(function (s) { return '<li><b>' + esc(md(s.date)) + '</b><span>' + esc([times(s), s.topic].filter(Boolean).join(' · ')) + '</span></li>'; })
+      .concat(c.waits.map(function (w) { return '<li class="w"><b>' + esc(md(w.date)) + '</b><span>' + esc(['#' + w.pos + ' on the waitlist', w.topic].filter(Boolean).join(' · ')) + '</span></li>'; }));
+    var need = isIS ? c.topics.filter(function (t) { return !have[t]; }) : [];
+    return '<a class="cls' + (c.seats.length ? ' mine' : '') + '" href="' + esc(url) + '"><div class="ct"><b>' + esc(c.title) + '</b><span class="chev" aria-hidden="true">›</span></div>' +
+      '<div class="tags">' + tags.join('') + '</div>' +
+      (lines.length ? '<ul class="mylist">' + lines.join('') + '</ul>' : '') +
+      (isIS && need.length && (c.seats.length || c.waits.length) ? '<p class="when" style="color:var(--wait);font-weight:600">Still need: ' + esc(need.join(', ')) + '</p>' : '') +
+      '<p class="when">' + esc([range, c.dates ? c.dates + (c.dates === 1 ? ' date' : ' dates') : '', c.location].filter(Boolean).join(' · ')) +
+        (c.deadline && !c.closed ? '<br>Sign up by ' + esc(md(c.deadline)) : '') + '</p></a>';
+  }
+
+  // Who are you?
+  function renderWho() {
+    app.innerHTML = '<div class="card"><h1>Sign in</h1><p class="note">Use the same PIN as your class sign-ups. This phone will remember you.</p>' +
+      '<div class="find" style="margin-top:14px"><input type="text" id="q" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" placeholder="Type your last name or call sign" aria-label="Your name">' +
+      '<ul class="drop" id="drop" role="listbox" hidden></ul></div>' +
+      '<p class="err" id="err">' + esc(st.err) + '</p>' +
+      (st.people ? '' : '<p class="note">Loading names…</p>') + '</div>';
+    var q = $('q');
+    q.oninput = drawDrop;
+    q.onkeydown = function (e) { if (e.key === 'Enter' && st.matches.length) { e.preventDefault(); pick(0); } };
+    setTimeout(function () { q.focus(); }, 50);
+  }
+  function drawDrop() {
+    var drop = $('drop'), q = $('q').value.trim().toLowerCase(), parts = q.split(/[\s.,]+/).filter(Boolean);
+    st.matches = !parts.length || !st.people ? [] : st.people.filter(function (p) {
+      var call = p.call.toLowerCase();
+      return parts.every(function (w) { return (call && call.indexOf(w) === 0) || p.words.some(function (x) { return x.indexOf(w) === 0; }); });
+    }).slice(0, 6);
+    if (!q) { drop.hidden = true; return; }
+    drop.innerHTML = st.matches.length ? st.matches.map(function (p, i) {
+      return '<li><button type="button" data-pick="' + i + '"><span>' + esc(p.name) + '</span><small>' + esc([p.rank, p.call].filter(Boolean).join(' · ')) + '</small></button></li>';
+    }).join('') : '<li class="none">No match. Not on any open class yet? See the training coordinator.</li>';
+    drop.hidden = false;
+    drop.onclick = function (e) { var b = e.target.closest('[data-pick]'); if (b) pick(+b.getAttribute('data-pick')); };
+  }
+  function pick(i) {
+    var p = st.matches[i]; if (!p) return;
+    st.me = { name: p.name, call: p.call };
+    store.set('ci-class-me', JSON.stringify(st.me));
+    if (passFor(st.me)) { st.step = ''; st.data = null; render(); loadClasses(); return; }
+    // Do they have a PIN yet? (Asking without one doesn't count as a try.)
+    app.innerHTML = '<p class="empty">One moment…</p>';
+    api('myLogin', { name: st.me.name, call: st.me.call }).then(function (res) {
+      st.step = res && res.pin === 'new' ? 'new' : 'pin'; st.err = res && res.pin === 'locked' ? res.message : ''; render();
+    }, function () { st.step = 'pin'; st.err = ''; render(); });
+  }
+
+  // PIN (or, the first time, email and a new PIN)
+  function renderPin() {
+    var isNew = st.step === 'new';
+    app.innerHTML = '<div class="card"><h1>' + (isNew ? 'Set up your PIN' : 'Enter your PIN') + '</h1>' +
+      '<p class="note"><b>' + esc(st.me.name) + '</b> · <button type="button" class="link" id="notme" style="padding:0">Not you?</button></p>' +
+      (isNew ? '<p class="note" style="margin-top:8px">Give your email and make up a 4-digit PIN. It\'s one PIN for all your class sign-ups. You\'ll get an email when you sign up or change a class.</p>' +
+          '<label class="field"><span>Email</span><input type="email" id="em" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com"></label>' : '') +
+      '<label class="field"><span>' + (isNew ? 'Make up a PIN (4 numbers)' : 'PIN') + '</span><input type="password" id="p1" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"></label>' +
+      (isNew ? '<label class="field"><span>Type the PIN again</span><input type="password" id="p2" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"></label>' : '') +
+      '<p class="err" id="err">' + esc(st.err) + '</p>' +
+      (isNew ? '' : '<p class="note">Forgot it? Contact the training coordinator to reset your PIN.</p>') +
+      '<div class="btns"><button type="button" class="btn" id="go"' + (st.busy ? ' disabled' : '') + '>' + (st.busy ? 'Checking…' : isNew ? 'Save and sign in' : 'Sign in') + '</button></div></div>';
+    $('notme').onclick = function () { store.set('ci-class-me', ''); st.me = null; st.step = 'who'; st.err = ''; render(); };
+    app.querySelectorAll('input[inputmode=numeric]').forEach(function (el) { el.oninput = function () { var v = el.value.replace(/\D/g, '').slice(0, 4); if (v !== el.value) el.value = v; }; });
+    app.onkeydown = function (e) { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); signIn(); } };
+    $('go').onclick = signIn;
+    setTimeout(function () { var f = $(isNew ? 'em' : 'p1'); if (f) f.focus(); }, 50);
+  }
+  function signIn() {
+    if (st.busy) return;
+    var isNew = st.step === 'new', p1 = $('p1').value.trim(), arg = { name: st.me.name, call: st.me.call, pin: p1 };
+    if (isNew) {
+      arg.email = $('em').value.trim();
+      if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(arg.email)) { $('err').textContent = 'Enter a good email address.'; return; }
+      if (p1 !== $('p2').value.trim()) { $('err').textContent = 'The two PINs don\'t match. Type them again.'; return; }
+    }
+    if (!/^\d{4}$/.test(p1)) { $('err').textContent = 'Your PIN should be 4 numbers.'; return; }
+    st.busy = true; render();
+    api('myLogin', arg).then(function (res) {
+      st.busy = false;
+      if (res && res.ok) { savePass(st.me, res.token); st.step = ''; st.err = ''; st.data = null; render(); loadClasses(); if (res.created) toast('Your PIN is set up.'); return; }
+      if (res && res.pin === 'new') { st.step = 'new'; st.err = isNew ? res.message : ''; render(); return; }
+      st.err = (res && res.message) || 'That didn\'t work. Try again.'; render();
+    }, function () { st.busy = false; st.err = 'Couldn\'t reach the training system. Check your signal.'; render(); });
+  }
+
+  // Change PIN
+  function openChangePin() {
+    var ov = $('pinov');
+    ov.innerHTML = '<div class="card"><h1>Change your PIN</h1><p class="note">It\'s one PIN for all your class sign-ups. Other phones will need the new PIN.</p>' +
+      '<label class="field"><span>Current PIN</span><input type="password" id="c0" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"></label>' +
+      '<label class="field"><span>New PIN (4 numbers)</span><input type="password" id="c1" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"></label>' +
+      '<label class="field"><span>New PIN again</span><input type="password" id="c2" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"></label>' +
+      '<p class="err" id="cerr"></p><div class="btns"><button type="button" class="btn ghost" id="ccancel">Cancel</button><button type="button" class="btn" id="csave">Save</button></div></div>';
+    ov.hidden = false;
+    ov.querySelectorAll('input').forEach(function (el) { el.oninput = function () { var v = el.value.replace(/\D/g, '').slice(0, 4); if (v !== el.value) el.value = v; $('cerr').textContent = ''; }; });
+    setTimeout(function () { $('c0').focus(); }, 50);
+    $('ccancel').onclick = function () { ov.hidden = true; };
+    ov.onclick = function (e) { if (e.target === ov) ov.hidden = true; };
+    $('csave').onclick = function () {
+      var a = $('c0').value, b = $('c1').value, c = $('c2').value;
+      if (!/^\d{4}$/.test(a)) { $('cerr').textContent = 'Enter your current 4-number PIN.'; return; }
+      if (!/^\d{4}$/.test(b)) { $('cerr').textContent = 'Your new PIN should be 4 numbers.'; return; }
+      if (b !== c) { $('cerr').textContent = 'The new PINs don\'t match.'; return; }
+      $('csave').disabled = true; $('csave').textContent = 'Saving…';
+      api('myPin', { name: st.me.name, call: st.me.call, token: passFor(st.me), pin: a, newPin: b }).then(function (res) {
+        if (res && res.ok) { ov.hidden = true; toast('Your PIN is changed.'); return; }
+        $('csave').disabled = false; $('csave').textContent = 'Save';
+        if (res && res.pin) { ov.hidden = true; savePass(st.me, ''); st.step = 'pin'; render(); return; }
+        $('cerr').textContent = (res && res.message) || 'That didn\'t save.';
+      }, function () { $('csave').disabled = false; $('csave').textContent = 'Save'; $('cerr').textContent = 'Couldn\'t reach the training system.'; });
+    };
+  }
+
+  // Fresh lists when the page comes back to the front.
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && !st.step && st.me) loadClasses(true); });
+})();
+</script>
+</body>
+</html>
