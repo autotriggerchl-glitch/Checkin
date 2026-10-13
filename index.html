@@ -4,6 +4,7 @@
   QR codes and links land here and go to the right page:
     ?c=...  class sign-up  (class.html)
     ?t=...  training check-in  (checkin.html)
+    nothing  My training: my classes and what's open  (mytraining.html)
   The check-in project's address is in config.js.
 -->
 <html lang="en">
@@ -14,7 +15,7 @@
 <script>
   (function () {
     var q = location.search || '';
-    location.replace((/[?&]c=/.test(q) ? 'class.html' : 'checkin.html') + q + location.hash);
+    location.replace((/[?&]c=/.test(q) ? 'class.html' : /[?&]t=/.test(q) ? 'checkin.html' : 'mytraining.html') + q + location.hash);
   })();
 </script>
 </head>
