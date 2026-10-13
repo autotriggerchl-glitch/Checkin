@@ -117,6 +117,10 @@
   .dtopic { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 2px; }
   .dtopic em { font-style: normal; font-size: 13px; font-weight: 700; padding: 2px 9px; border-radius: 6px; background: #E6EBF3; color: var(--navy); }
   .dtopic .have { font-size: 13px; font-weight: 700; color: var(--ok); }
+  .dayhead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 20px 2px 10px; padding: 0 0 8px; border-bottom: 2px solid var(--navy); }
+  .dayhead b { font-size: 19px; color: var(--navy); }
+  .dayhead span { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  .dhead b.tbig { font-size: 22px; letter-spacing: .5px; font-variant-numeric: tabular-nums; }
   .daygap { margin: 16px 2px 8px; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
   .swfrom { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: #F3F6FB; font-size: 16px; line-height: 1.5; }
   .swfrom s { color: var(--muted); }
@@ -342,11 +346,15 @@ function start() {
       // Every date in order, each showing its topic.
       var all = c.dates.filter(function (d) { return d.date >= st.today || myStatus(d.topic).seat === d; })
         .slice().sort(function (a, b) { return (a.date + (a.start || '')).localeCompare(b.date + (b.start || '')); });
-      var lastMonth = '';
+      var months = [];
       all.forEach(function (d) {
         var mon = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][+d.date.slice(5, 7) - 1];
-        if (mon !== lastMonth) { html += '<p class="daygap">' + esc(mon) + '</p>'; lastMonth = mon; }
-        html += dateCard(d, myStatus(d.topic), closed, busyDays[d.date] && busyDays[d.date] !== d.topic ? busyDays[d.date] : '', true);
+        if (!months.length || months[months.length - 1].mon !== mon) months.push({ mon: mon, list: [] });
+        months[months.length - 1].list.push(d);
+      });
+      months.forEach(function (m) {
+        html += '<p class="daygap">' + esc(m.mon) + '</p>' +
+          byDay(m.list, function (d, timeFirst) { return dateCard(d, myStatus(d.topic), closed, busyDays[d.date] && busyDays[d.date] !== d.topic ? busyDays[d.date] : '', true, timeFirst); });
       });
       if (!all.length) html += '<p class="note">No upcoming dates.</p>';
     } else groups.forEach(function (g) {
@@ -354,7 +362,7 @@ function start() {
       if (isIS()) html += '<h3 class="topic">' + esc(g) + '<span class="' + (m.seat ? 'ok">' + esc(shortDay(m.seat.date)) : 'need">' + (st.me ? 'Not picked' : '')) + '</span></h3>';
       // Dates already past aren't shown (unless this officer is on one).
       var shown = c.dates.filter(function (d) { return (!isIS() || d.topic === g) && (d.date >= st.today || m.seat === d); });
-      html += shown.map(function (d) { return dateCard(d, m, closed, busyDays[d.date] && busyDays[d.date] !== g ? busyDays[d.date] : ''); }).join('') ||
+      html += byDay(shown, function (d, timeFirst) { return dateCard(d, m, closed, busyDays[d.date] && busyDays[d.date] !== g ? busyDays[d.date] : '', false, timeFirst); }) ||
         '<p class="note">No upcoming dates.</p>';
     });
     html += '<div class="foot"><span>Updated ' + esc(clock(new Date())) + '</span><button type="button" class="link" id="refresh">Refresh</button></div>';
@@ -364,7 +372,27 @@ function start() {
 
   function clock(d) { return ('0' + d.getHours()).slice(-2) + ('0' + d.getMinutes()).slice(-2); }
 
-  function dateCard(d, mine, closed, also, showTopic) {
+  // Several sessions on the same day: the day once, as a heading, then
+  // each session by its time, so they don't look like repeats.
+  function byDay(list, cardFn) {
+    var out = '', i = 0;
+    list = list.slice().sort(function (a, b) { return (a.date + (a.start || '')).localeCompare(b.date + (b.start || '')); });
+    while (i < list.length) {
+      var j = i; while (j < list.length && list[j].date === list[i].date) j++;
+      if (j - i > 1) {
+        out += '<div class="dayhead"><b>' + esc(day(list[i].date)) + '</b><span>' + (j - i) + ' sessions · pick one</span></div>';
+        for (var k = i; k < j; k++) out += cardFn(list[k], true);
+      } else out += cardFn(list[i], false);
+      i = j;
+    }
+    return out;
+  }
+  function partOfDay(d) {
+    var h = +String(d.start || '').slice(0, 2);
+    if (!d.start) return '';
+    return h < 5 ? 'Overnight' : h < 11 ? 'Morning' : h < 14 ? 'Midday' : h < 17 ? 'Afternoon' : 'Evening';
+  }
+  function dateCard(d, mine, closed, also, showTopic, timeFirst) {
     var taken = d['in'].length, left = d.seats - taken, past = d.date < st.today;
     var seatHere = mine.seat === d, waitHere = mine.wait && mine.wait.d === d;
     var chip = past ? '<span class="seats past">Past</span>'
@@ -374,7 +402,9 @@ function start() {
       '<div class="dhead"><div>' +
         (showTopic ? '<p class="dtopic"><em>' + esc(d.topic) + '</em>' +
           (mine.seat && mine.seat !== d ? '<span class="have">\u2713 You have it ' + esc(shortDay(mine.seat.date)) + '</span>' : '') + '</p>' : '') +
-        '<b>' + esc(day(d.date)) + '</b><small>' + esc([times(d), d.location].filter(Boolean).join(' · ')) +
+        (timeFirst
+          ? '<b class="tbig">' + esc(d.start ? d.start + (d.end ? '–' + d.end : '') : 'Session') + '</b><small>' + esc([partOfDay(d), d.location].filter(Boolean).join(' · '))
+          : '<b>' + esc(day(d.date)) + '</b><small>' + esc([times(d), d.location].filter(Boolean).join(' · '))) +
         '</small><small>' + taken + ' of ' + d.seats + ' signed up</small>' +
         (also && !seatHere ? '<small style="color:var(--wait);font-weight:700">You\'re in ' + esc(also) + ' that day.</small>' : '') + '</div>' + chip + '</div>' +
       '<div class="bar"><i style="width:' + Math.min(100, Math.round(taken / d.seats * 100)) + '%"></i></div>';
@@ -404,7 +434,7 @@ function start() {
       } else if (left > 0) {
         var sw = !!mine.seat;
         b = '<button type="button" class="btn' + (sw ? ' ghost' : '') + '" data-op="join" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>' +
-              (busy ? 'Saving…' : sw ? 'Switch to this date' : 'Sign up for this date') + '</button>';
+              (busy ? 'Saving…' : (sw ? 'Switch to this ' : 'Sign up for this ') + (timeFirst ? 'time' : 'date')) + '</button>';
       } else {
         b = '<button type="button" class="btn ghost" data-op="wait" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>' +
           (busy ? 'Saving…' : 'Join the waitlist') + '</button>' +
