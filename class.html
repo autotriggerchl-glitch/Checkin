@@ -228,7 +228,9 @@ function start() {
   try {
     // Who picked on this phone: for this class, or the last class.
     var saved = JSON.parse(store.get(meKey) || 'null') || JSON.parse(store.get('ci-class-me') || 'null');
-    if (saved) st.me = PEOPLE.filter(function (p) { return p.name === saved.name && p.call === saved.call; })[0] || null;
+    if (saved) st.me = PEOPLE.filter(function (p) { return p.name === saved.name && p.call === saved.call; })[0] ||
+      // Their name changed in the Employee Directory: same call sign.
+      (saved.call ? PEOPLE.filter(function (p) { return p.call && p.call.toUpperCase() === String(saved.call).toUpperCase(); })[0] : null) || null;
   } catch (e) {}
 
   render();
@@ -249,7 +251,13 @@ function start() {
     return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(+m[1], +m[2] - 1, +m[3]).getDay()] + ' ' + (+m[2]) + '/' + (+m[3]);
   }
   function times(d) { return d.start ? d.start + (d.end ? '-' + d.end : '') : ''; }
-  function isMe(x) { return st.me && x.n === st.me.name && String(x.c || '') === st.me.call; }
+  // The same person: by call sign when both have one, otherwise by name.
+  function samePerson(x, me) {
+    if (!me) return false;
+    if (x.c && me.call) return String(x.c).toUpperCase() === String(me.call).toUpperCase();
+    return String(x.n || '').toLowerCase().replace(/[^a-z]/g, '') === String(me.name || '').toLowerCase().replace(/[^a-z]/g, '');
+  }
+  function isMe(x) { return samePerson(x, st.me); }
 
   function closedReason() {
     var c = st.cls;
@@ -536,11 +544,25 @@ function start() {
     send(op, dateId);
   }
 
-  function hasPin() { return !!(st.me && (st.cls.pinSet || []).indexOf(st.me.name + '|' + st.me.call) >= 0); }
+  function hasPin() {
+    if (!st.me) return false;
+    var set = st.cls.pinSet || [];
+    if (set.indexOf(st.me.name + '|' + st.me.call) >= 0) return true;
+    var cs = String(st.me.call || '').toUpperCase();
+    return !!cs && set.some(function (k) { return k.slice(k.lastIndexOf('|') + 1).toUpperCase() === cs; });
+  }
 
   // This phone's remembered pass for each officer (instead of the PIN).
   function passes() { try { return JSON.parse(store.get('ci-pass') || '{}') || {}; } catch (e) { return {}; } }
-  function myPass() { return st.me ? passes()[st.me.name + '|' + st.me.call] || '' : ''; }
+  function myPass() {
+    if (!st.me) return '';
+    var all = passes(), hit = all[st.me.name + '|' + st.me.call];
+    if (hit) return hit;
+    // Saved under their old name (changed in the Directory): same call sign.
+    var cs = String(st.me.call || '').toUpperCase();
+    var k = cs && Object.keys(all).filter(function (x) { return x.slice(x.lastIndexOf('|') + 1).toUpperCase() === cs; })[0];
+    return k ? all[k] : '';
+  }
   function savePass(token) {
     var all = passes(), k = st.me.name + '|' + st.me.call;
     if (token) all[k] = token; else delete all[k];
@@ -565,7 +587,7 @@ function start() {
   }
 
   function meOf() { return { n: st.me.name, c: st.me.call }; }
-  function same(x) { return x.n === st.me.name && String(x.c || '') === st.me.call; }
+  function same(x) { return samePerson(x, st.me); }
 
   function applyLocal(op, dateId) {
     var d = st.cls.dates.filter(function (x) { return x.id === dateId; })[0];
