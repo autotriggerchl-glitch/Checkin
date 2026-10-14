@@ -112,7 +112,15 @@
   // Shared with the class sign-up page: who's on this phone, and their pass.
   function meSaved() { try { return JSON.parse(store.get('ci-class-me') || 'null'); } catch (e) { return null; } }
   function passes() { try { return JSON.parse(store.get('ci-pass') || '{}') || {}; } catch (e) { return {}; } }
-  function passFor(me) { return me ? passes()[me.name + '|' + me.call] || '' : ''; }
+  function passFor(me) {
+    if (!me) return '';
+    var all = passes(), hit = all[me.name + '|' + me.call];
+    if (hit) return hit;
+    // Saved under their old name (changed in the Directory): same call sign.
+    var cs = String(me.call || '').toUpperCase();
+    var k = cs && Object.keys(all).filter(function (x) { return x.slice(x.lastIndexOf('|') + 1).toUpperCase() === cs; })[0];
+    return k ? all[k] : '';
+  }
   function savePass(me, token) { var all = passes(), k = me.name + '|' + me.call; if (token) all[k] = token; else delete all[k]; store.set('ci-pass', JSON.stringify(all)); }
 
   var st = { people: null, me: meSaved(), data: null, step: '', matches: [], busy: false, err: '' };
@@ -129,7 +137,13 @@
   // ---------- Start ----------
   if (st.me && passFor(st.me)) { render(); loadClasses(); } else { st.step = 'who'; render(); }
   api('myPeople').then(function (res) {
-    if (!res || !res.ok) return;
+    if (!res || !res.ok) {
+      st.people = [];
+      st.err = res && /unknown request/i.test(res.message || '') ? 'This page is waiting on an update to the training system. Ask the training coordinator (check-in project: New version).'
+        : (res && res.message) || 'The names didn\'t load. Reload the page.';
+      if (st.step === 'who') render();
+      return;
+    }
     st.people = res.people.map(function (p) {
       var words = String(p[0]).toLowerCase().split(/[\s.,'-]+/).filter(Boolean);
       return { name: p[0], call: p[1] || '', rank: p[2] || '', words: words, last: words[words.length - 1] || '' };
@@ -141,7 +155,16 @@
   function loadClasses(quiet) {
     if (!st.me) return;
     api('myClasses', { name: st.me.name, call: st.me.call, token: passFor(st.me) }).then(function (res) {
-      if (res && res.ok) { st.data = res; store.set('ci-my-classes', JSON.stringify(res)); render(); if (!quiet) {} return; }
+      if (res && res.ok) {
+        // Their name changed in the Employee Directory: keep the new one.
+        if (res.me && res.me.name && res.me.name !== st.me.name) {
+          var tok = passFor(st.me);
+          st.me = { name: res.me.name, call: res.me.call || st.me.call };
+          store.set('ci-class-me', JSON.stringify(st.me));
+          if (tok) savePass(st.me, tok);
+        }
+        st.data = res; store.set('ci-my-classes', JSON.stringify(res)); render(); return;
+      }
       if (res && res.pin) { savePass(st.me, ''); st.data = null; st.step = 'pin'; st.err = ''; render(); return; }
       if (res && res.gone) { st.data = null; st.step = 'who'; st.err = res.message; render(); return; }
       if (!quiet) toast((res && res.message) || 'That didn\'t load.', true);
@@ -201,7 +224,7 @@
       '<div class="find" style="margin-top:14px"><input type="text" id="q" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" placeholder="Type your last name or call sign" aria-label="Your name">' +
       '<ul class="drop" id="drop" role="listbox" hidden></ul></div>' +
       '<p class="err" id="err">' + esc(st.err) + '</p>' +
-      (st.people ? '' : '<p class="note">Loading names…</p>') + '</div>';
+      (st.people ? (st.people.length || st.err ? '' : '<p class="note">No classes are open right now.</p>') : '<p class="note">Loading names…</p>') + '</div>';
     var q = $('q');
     q.oninput = drawDrop;
     q.onkeydown = function (e) { if (e.key === 'Enter' && st.matches.length) { e.preventDefault(); pick(0); } };
