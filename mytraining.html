@@ -265,12 +265,21 @@
       '<label class="field"><span>' + (isNew ? 'Make up a PIN (4 numbers)' : 'PIN') + '</span><input type="password" id="p1" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"></label>' +
       (isNew ? '<label class="field"><span>Type the PIN again</span><input type="password" id="p2" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"></label>' : '') +
       '<p class="err" id="err">' + esc(st.err) + '</p>' +
-      (isNew ? '' : '<p class="note">Forgot it? Contact the training coordinator to reset your PIN.</p>') +
+      (isNew ? '' : '<p class="note"><button type="button" class="link" id="forgot" style="padding:0">Forgot your PIN? Email me a temporary PIN</button></p><p class="note" id="forgotmsg"' + (st.forgotMsg ? '' : ' hidden') + '>' + (st.forgotMsg || '') + '</p>') +
       '<div class="btns"><button type="button" class="btn" id="go"' + (st.busy ? ' disabled' : '') + '>' + (st.busy ? 'Checking…' : isNew ? 'Save and sign in' : 'Sign in') + '</button></div></div>';
     $('notme').onclick = function () { store.set('ci-class-me', ''); st.me = null; st.step = 'who'; st.err = ''; render(); };
     app.querySelectorAll('input[inputmode=numeric]').forEach(function (el) { el.oninput = function () { var v = el.value.replace(/\D/g, '').slice(0, 4); if (v !== el.value) el.value = v; }; });
     app.onkeydown = function (e) { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); signIn(); } };
     $('go').onclick = signIn;
+    if ($('forgot')) $('forgot').onclick = function () {
+      var b = $('forgot'), msg = $('forgotmsg');
+      b.disabled = true; msg.hidden = false; msg.textContent = 'Sending…';
+      api('pinForgot', { name: st.me.name, call: st.me.call }).then(function (res) {
+        b.disabled = false;
+        st.forgotMsg = esc((res && res.message) || 'That didn\'t work.') + (res && res.ok ? ' <b>Type it in above.</b>' : res && res.none ? '' : ' <b>Or contact the training coordinator.</b>');
+        msg.innerHTML = st.forgotMsg; $('p1').focus();
+      }, function () { b.disabled = false; msg.textContent = 'Couldn\'t reach the training system. Check your signal.'; });
+    };
     setTimeout(function () { var f = $(isNew ? 'em' : 'p1'); if (f) f.focus(); }, 50);
   }
   function signIn() {
@@ -285,7 +294,7 @@
     st.busy = true; render();
     api('myLogin', arg).then(function (res) {
       st.busy = false;
-      if (res && res.ok) { savePass(st.me, res.token); st.step = ''; st.err = ''; st.data = null; render(); loadClasses(); if (res.created) toast('Your PIN is set up.'); return; }
+      if (res && res.ok) { savePass(st.me, res.token); st.step = ''; st.err = ''; st.data = null; render(); loadClasses(); st.forgotMsg = ''; if (res.created) toast('Your PIN is set up.'); else if (res.temp) toast('Signed in. Your temporary PIN is your PIN now (Change PIN to pick your own).'); return; }
       if (res && res.pin === 'new') { st.step = 'new'; st.err = isNew ? res.message : ''; render(); return; }
       st.err = (res && res.message) || 'That didn\'t work. Try again.'; render();
     }, function () { st.busy = false; st.err = 'Couldn\'t reach the training system. Check your signal.'; render(); });
