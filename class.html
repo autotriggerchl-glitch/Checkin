@@ -736,7 +736,7 @@ function start() {
       ov.addEventListener('click', function (e) {
         var b = e.target.closest && e.target.closest('button');
         if (e.target === ov || (b && b.id === 'pin-cancel')) { ov.hidden = true; return; }
-        if (b && b.id === 'pin-forgot') { $('pin-forgot-msg').hidden = false; return; }
+        if (b && b.id === 'pin-forgot') { forgotPin(); return; }
         if (b && b.id === 'pin-go') pinSubmit();
       });
       ov.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); pinSubmit(); } });
@@ -760,8 +760,8 @@ function start() {
         : '<h2 class="pint">Enter your PIN</h2><p class="note">The 4-digit PIN you made the first time you signed up for a class. This phone will remember it.</p>' +
           pinBox('pin-1', 'PIN')) +
       '<p class="pin-err" id="pin-err" role="alert">' + esc(mode === 'new' && !message ? '' : message || '') + '</p>' +
-      (isNew ? '' : '<button type="button" class="link" id="pin-forgot">Forgot your PIN?</button>' +
-        '<p class="note" id="pin-forgot-msg" hidden><b>Contact the training coordinator to reset your PIN.</b> Then you can make a new one here.</p>') +
+      (isNew ? '' : '<button type="button" class="link" id="pin-forgot">Forgot your PIN? Email me a temporary PIN</button>' +
+        '<p class="note" id="pin-forgot-msg" hidden>' + (mode === 'locked' ? 'Tap the link above for a temporary PIN by email, or wait 15 minutes.' : '') + '</p>') +
       '<div class="pinbtns"><button type="button" class="btn ghost" id="pin-cancel">Cancel</button>' +
         '<button type="button" class="btn" id="pin-go"' + (mode === 'locked' ? ' disabled' : '') + '>' + (isNew ? 'Save and sign up' : 'Continue') + '</button></div>' +
       '</div>';
@@ -769,6 +769,23 @@ function start() {
     ov.hidden = false;
     var first = $(isNew ? 'pin-email' : 'pin-1');
     if (first) setTimeout(function () { first.focus(); }, 50);
+  }
+
+  // Forgot the PIN: a temporary one goes to the email they gave with it.
+  function forgotPin() {
+    var msg = $('pin-forgot-msg'), btn = $('pin-forgot');
+    if (!msg || !st.me || btn.disabled) return;
+    btn.disabled = true;
+    msg.hidden = false; msg.textContent = 'Sending…';
+    api('pinForgot', { name: st.me.name, call: st.me.call }).then(function (res) {
+      btn.disabled = false;
+      msg.innerHTML = esc((res && res.message) || 'That didn\'t work.') + (res && res.ok ? ' <b>Type it in above.</b>' : res && res.none ? '' : ' <b>Or contact the training coordinator.</b>');
+      // A locked screen can take the temporary PIN.
+      if (res && res.ok && st.pinMode === 'locked') { st.pinMode = 'need'; $('pin-go').disabled = false; var p = $('pin-1'); if (p) p.focus(); }
+    }, function () {
+      btn.disabled = false;
+      msg.textContent = 'Couldn\'t reach the training system. Check your signal, or contact the training coordinator.';
+    });
   }
 
   function pinSubmit() {
