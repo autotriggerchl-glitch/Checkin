@@ -284,6 +284,11 @@ function start() {
   }).sort(function (a, b) { return (a.last + a.name).localeCompare(b.last + b.name); });
 
   var QUAL = DATA.qual && DATA.qual.courses && DATA.qual.courses.length ? DATA.qual : null;
+  // The roles this training uses (the supervisor picks them), like
+  // [['officer', 'Attendee'], ['other', 'Observer']]. Older check-ins: the usual three.
+  var ROLES = (DATA.roles && DATA.roles.length ? DATA.roles : [['officer', 'Attendee'], ['instructor', 'Instructor'], ['roleplayer', 'Role player']])
+    .filter(function (r) { return r && r[0] && r[1]; });
+  if (ROLES.length === 1) st.role = ROLES[0][0]; // only one choice: picked for them
   var already = null;
   try { already = JSON.parse(store.get(doneKey) || 'null'); } catch (e) {}
   // A qualification: the officer who used this phone can come back to add a score.
@@ -318,9 +323,9 @@ function start() {
 
       '<div class="card"><h2><i>1</i> &nbsp;Your name</h2><div id="who"></div></div>' +
 
-      '<div class="card"><h2><i>2</i> &nbsp;My role in this training</h2><div class="roles" role="radiogroup" aria-label="My role">' +
-        [['officer', 'Attendee'], ['instructor', 'Instructor'], ['roleplayer', 'Role player']].map(function (r) {
-          return '<button type="button" role="radio" aria-checked="false" data-role="' + r[0] + '">' + r[1] + '</button>';
+      '<div class="card"><h2><i>2</i> &nbsp;My role in this training</h2><div class="roles" role="radiogroup" aria-label="My role" style="grid-template-columns:repeat(' + (ROLES.length > 3 ? 2 : ROLES.length) + ',1fr)">' +
+        ROLES.map(function (r) {
+          return '<button type="button" role="radio" aria-checked="' + (st.role === r[0]) + '" data-role="' + esc(r[0]) + '">' + esc(r[1]) + '</button>';
         }).join('') + '</div></div>' +
 
       '<div class="card"><h2><i>3</i> &nbsp;Sign with your finger</h2>' + BAR_TIP +
@@ -695,7 +700,7 @@ function start() {
     // What this screen shows afterwards (the check-in project can't read any of it).
     var shown = {
       name: st.person ? st.person.name : ($('gname') ? $('gname').value.trim() : ''),
-      role: ({ officer: 'Attendee', instructor: 'Instructor', roleplayer: 'Role player' })[st.role] || '',
+      role: (ROLES.filter(function (r) { return r[0] === st.role; })[0] || [])[1] || '',
       title: T.title, qual: !!QUAL,
       scores: QUAL ? QUAL.courses.filter(function (c) { return req.scores[c.key]; })
         .map(function (c) { return c.name + ' ' + req.scores[c.key].h + '/' + c.rounds; }) : []
@@ -770,6 +775,7 @@ function start() {
     return LOCK.open(d.box).then(function (inner) {
       d.training = inner.training || {};
       d.people = inner.people || [];
+      if (inner.roles) d.roles = inner.roles;
       d.qual = inner.qual || null;
       if (inner.certify) d.certify = inner.certify;
       go(d);
