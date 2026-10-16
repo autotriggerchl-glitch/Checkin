@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Department display</title>
+<script src="config.js"></script>
+<style>
+  :root {
+    --bg: #0B1426; --panel: #13213A; --panel2: #1A2C4C; --line: #2A3F66; --ink: #EEF2F8; --muted: #9FB0CC;
+    --gold: #C8A64B; --ok: #3FBF7F; --warn: #F2B544; --err: #FF6B5E; --chg: #F2B544;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
+  body { font: 400 clamp(13px, 1.05vw, 34px)/1.3 "Segoe UI", Roboto, Arial, sans-serif; cursor: none; }
+  .screen { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr auto; }
+  /* Header */
+  .hd { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1.2em; padding: .6em 1.2em; background: var(--panel); border-bottom: .2em solid var(--gold); }
+  .hd img { height: 3.2em; width: 3.2em; object-fit: contain; }
+  .hd .dept { font-size: .8em; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .hd .bname { font-size: 1.7em; font-weight: 800; letter-spacing: .01em; }
+  .hd .right { text-align: right; }
+  .hd .clock { font-size: 2.2em; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .hd .date { color: var(--muted); font-weight: 600; margin-top: .2em; }
+  .hd .wx { color: var(--muted); font-size: .9em; margin-top: .1em; }
+  /* Body grid */
+  .body { position: relative; padding: .8em; display: grid; gap: .8em; min-height: 0; }
+  .l-one { grid-template: 1fr / 1fr; }
+  .l-two { grid-template: 1fr / 1fr 1fr; }
+  .l-side { grid-template: 1fr / 2fr 1fr; }
+  .l-three { grid-template: 1fr 1fr / 2fr 1fr; }
+  .l-three > .tile:first-child { grid-row: 1 / 3; }
+  .l-four { grid-template: 1fr 1fr / 1fr 1fr; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: .7em; display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+  .tile > h2 { margin: 0; padding: .45em .8em; background: var(--panel2); font-size: 1.05em; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); display: flex; justify-content: space-between; gap: 1em; }
+  .tile > h2 small { color: var(--muted); letter-spacing: 0; text-transform: none; font-weight: 600; }
+  .tile .in { flex: 1; overflow: hidden; padding: .6em .8em; position: relative; }
+  .tile .scroll { will-change: transform; }
+  .empty { color: var(--muted); padding: 1em 0; }
+  /* People rows */
+  .shifts { display: grid; grid-template-columns: repeat(auto-fit, minmax(16em, 1fr)); gap: .8em; }
+  .shift h3 { margin: 0 0 .3em; font-size: 1em; display: flex; justify-content: space-between; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .shift.now h3 { color: var(--ok); }
+  .shift.now h3::after { content: "NOW"; background: var(--ok); color: #062512; border-radius: .3em; padding: 0 .4em; font-size: .8em; }
+  .pr { display: grid; grid-template-columns: 3.4em 1fr auto; gap: .5em; align-items: baseline; padding: .22em 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .pr .cs { background: #2B4677; border-radius: .3em; text-align: center; font-weight: 700; font-size: .9em; padding: .05em 0; }
+  .pr .nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pr .nm small { color: var(--muted); font-weight: 400; margin-left: .4em; }
+  .pr .ex { color: var(--muted); white-space: nowrap; font-size: .9em; }
+  .pr.sup .cs { background: var(--gold); color: #1B1405; }
+  .pr.ot .cs { background: #6B3FA0; }
+  .chg { animation: flash 2s ease-in-out 0s 8; }
+  @keyframes flash { 0%, 100% { background: transparent; } 50% { background: rgba(242, 181, 68, .28); } }
+  /* Staffing */
+  .stf { display: grid; gap: .6em; }
+  .stc { display: grid; grid-template-columns: 1fr auto; align-items: center; padding: .6em .8em; border-radius: .5em; background: var(--panel2); border-left: .35em solid var(--ok); }
+  .stc.short { border-left-color: var(--err); }
+  .stc.now { box-shadow: 0 0 0 2px var(--ok) inset; }
+  .stc b { font-size: 1.15em; }
+  .stc .num { font-size: 2.2em; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .stc .txt { grid-column: 1 / -1; color: var(--muted); }
+  .stc.short .txt { color: var(--err); font-weight: 700; }
+  /* Lists */
+  .li { padding: .35em 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .li b { font-weight: 700; }
+  .li .sub { color: var(--muted); font-size: .9em; }
+  .day { margin: .5em 0 .2em; color: var(--gold); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; font-size: .9em; }
+  .day:first-child { margin-top: 0; }
+  .big { font-size: 4em; font-weight: 800; line-height: 1; }
+  .bad { color: var(--err); }
+  .chips { display: flex; flex-wrap: wrap; gap: .4em; }
+  .chip { background: var(--panel2); border-radius: .4em; padding: .2em .5em; white-space: nowrap; }
+  .chip b { margin-right: .3em; }
+  .oos { border-left: .3em solid var(--err); padding-left: .5em; }
+  /* Message and clock tiles */
+  .msg { font-size: 1.9em; font-weight: 700; line-height: 1.25; white-space: pre-wrap; }
+  .bigclock { text-align: center; padding-top: .4em; }
+  .bigclock .t { font-size: 5.5em; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .bigclock .d { font-size: 1.5em; color: var(--muted); margin-top: .3em; }
+  .bigclock .w { font-size: 1.5em; margin-top: .8em; }
+  /* Ticker */
+  .tick { background: var(--gold); color: #1B1405; font-weight: 800; font-size: 1.3em; white-space: nowrap; overflow: hidden; padding: .35em 0; }
+  .tick span { display: inline-block; padding-left: 100%; animation: tick linear infinite; }
+  @keyframes tick { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+  /* Status */
+  .status { position: fixed; right: .8em; bottom: .6em; font-size: .8em; color: var(--muted); background: rgba(11,20,38,.85); padding: .2em .6em; border-radius: .4em; }
+  .status.warn { color: var(--warn); }
+  .stop { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 2em; }
+  .stop h1 { font-size: 2.4em; margin: 0 0 .4em; }
+  .stop p { color: var(--muted); font-size: 1.3em; max-width: 40em; }
+</style>
+</head>
+<body>
+<div id="app"><div class="stop"><div><h1>Loading…</h1></div></div></div>
+<div class="status" id="status" hidden></div>
+<script>
+// ---------- The lock (must match CheckinLock.gs in the Duty Roster) ----------
+var LOCK = (function () {
+  var enc = new TextEncoder(), dec = new TextDecoder();
+  var key = (location.hash.match(/[#&]x=([A-Za-z0-9_-]+)/) || [])[1] || '';
+  function b64ToBytes(s) {
+    s = String(s).replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    var bin = atob(s), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function bytesToB64(u) {
+    var s = '';
+    for (var i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  function hmacKey(raw) { return crypto.subtle.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']); }
+  function hmac(k, msg) { return crypto.subtle.sign('HMAC', k, msg).then(function (b) { return new Uint8Array(b); }); }
+  var parts = null;
+  function getParts() {
+    if (!parts) {
+      parts = hmacKey(b64ToBytes(key))
+        .then(function (k) { return Promise.all([hmac(k, enc.encode('enc')), hmac(k, enc.encode('mac'))]); })
+        .then(function (r) { return Promise.all([hmacKey(r[0]), hmacKey(r[1])]); })
+        .then(function (r) { return { enc: r[0], mac: r[1] }; });
+    }
+    return parts;
+  }
+  function stream(encKey, nonce, data) {
+    var jobs = [];
+    for (var b = 0; b < Math.ceil(data.length / 32); b++) {
+      var m = new Uint8Array(20);
+      m.set(nonce, 0);
+      m[16] = (b >>> 24) & 255; m[17] = (b >>> 16) & 255; m[18] = (b >>> 8) & 255; m[19] = b & 255;
+      jobs.push(hmac(encKey, m));
+    }
+    return Promise.all(jobs).then(function (ks) {
+      var out = new Uint8Array(data.length);
+      for (var i = 0; i < data.length; i++) out[i] = data[i] ^ ks[i >> 5][i & 31];
+      return out;
+    });
+  }
+  return {
+    has: function () { return !!key && !!(window.crypto && crypto.subtle); },
+    open: function (b64) {
+      var all = b64ToBytes(b64);
+      if (all.length < 48) return Promise.reject(new Error('short'));
+      var nonce = all.subarray(0, 16), ct = all.subarray(16, all.length - 32), tag = all.subarray(all.length - 32);
+      return getParts().then(function (p) {
+        return hmac(p.mac, all.subarray(0, all.length - 32)).then(function (want) {
+          var d = 0;
+          for (var i = 0; i < 32; i++) d |= want[i] ^ tag[i];
+          if (d) throw new Error('bad key');
+          return stream(p.enc, nonce, ct);
+        });
+      }).then(function (pt) { return JSON.parse(dec.decode(pt)); });
+    },
+    seal: function (obj) {
+      var pt = enc.encode(JSON.stringify(obj)), nonce = crypto.getRandomValues(new Uint8Array(16));
+      return getParts().then(function (p) {
+        return stream(p.enc, nonce, pt).then(function (ct) {
+          var body = new Uint8Array(16 + ct.length);
+          body.set(nonce, 0); body.set(ct, 16);
+          return hmac(p.mac, body).then(function (tag) {
+            var all = new Uint8Array(body.length + 32);
+            all.set(body, 0); all.set(tag, body.length);
+            return bytesToB64(all);
+          });
+        });
+      });
+    }
+  };
+})();  
+
+// ---------- The display ----------
+(function () {
+  var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
+  var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
+  var POLL = 30000;
+  var q = new URLSearchParams(location.search);
+  var id = q.get('d') || '';
+  var app = document.getElementById('app'), status = document.getElementById('status');
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var store = { get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+  var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  var st = { data: null, v: '', board: 0, boardAt: 0, lastOk: 0, prev: {}, changed: {}, wx: null, rotTimer: null };
+
+  function stop(title, msg) { app.innerHTML = '<div class="stop"><div><h1>' + esc(title) + '</h1><p>' + esc(msg) + '</p></div></div>'; }
+  if (!id) { stop('Display link', 'This link is missing its display code. Copy the link again from Admin > Displays.'); return; }
+  if (!LOCK.has()) { stop('Display link', 'This link is missing its key, or this browser is too old. Copy the whole link again from Admin > Displays.'); return; }
+
+  function pad(n) { return ('0' + n).slice(-2); }
+  function hm(d) { return pad(d.getHours()) + pad(d.getMinutes()); }
+  function longDate(d) { return DAYS[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate(); }
+  function dayLabel(ds) {
+    var m = String(ds).match(/^(\d{4})-(\d{2})-(\d{2})$/); if (!m) return ds;
+    var d = new Date(+m[1], +m[2] - 1, +m[3]), now = new Date(), t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var diff = Math.round((d - t0) / 86400000);
+    return diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : DAYS[d.getDay()].slice(0, 3) + ' ' + (+m[2]) + '/' + (+m[3]);
+  }
+  function times(x) { return x.start ? x.start + (x.end ? '–' + x.end : '') : ''; }
+
+  // ---------- Getting the data ----------
+  function api(name, arg) {
+    return fetch(APP_URL, { method: 'POST', body: JSON.stringify({ pub: name, arg: arg }) })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+  }
+  function load() {
+    api('oidGet', { d: id, v: st.v }).then(function (res) {
+      if (res && res.ok && res.same) { st.lastOk = Date.now(); showStatus(); return; }
+      if (!res || !res.ok) {
+        if (!st.data) stop('Display', (res && res.message) || 'Waiting for the Duty Roster.');
+        showStatus(res && res.message);
+        return;
+      }
+      LOCK.open(res.box).then(function (payload) {
+        store.set('oid-box-' + id, res.box);
+        st.v = res.v; st.lastOk = Date.now();
+        take(payload);
+      }, function () { stop('Display link', "This link's key doesn't match. Copy the link again from Admin > Displays."); });
+    }, function () { showStatus('No connection. Trying again.'); });
+  }
+  function showStatus(problem) {
+    var at = st.data && st.data.at ? new Date(st.data.at) : null;
+    var old = at && Date.now() - at.getTime() > 5 * 60000;
+    if (problem || old) {
+      status.hidden = false;
+      status.className = 'status warn';
+      status.textContent = (problem ? problem + ' ' : '') + (at ? 'Last update ' + hm(at) : '');
+    } else status.hidden = true;
+  }
+
+  // Remember what each list showed, to flash what changed.
+  function rowSig(x) { return [x.n, x.cs, x.u, x.d, x.p, x.h].join('|'); }
+  function take(payload) {
+    var first = !st.data;
+    st.data = payload;
+    var now = Date.now();
+    (payload.boards || []).forEach(function (b, bi) {
+      (b.board.tiles || []).forEach(function (t, ti) {
+        var k = bi + ':' + ti, sigs = {};
+        (t.shifts || []).forEach(function (s) { s.rows.forEach(function (x) { sigs[s.key + '|' + rowSig(x)] = 1; }); });
+        (t.rows || []).forEach(function (x) { sigs[JSON.stringify(x)] = 1; });
+        if (!first && st.prev[k]) Object.keys(sigs).forEach(function (sg) { if (!st.prev[k][sg]) st.changed[k + '|' + sg] = now; });
+        st.prev[k] = sigs;
+      });
+    });
+    if (st.board >= (payload.boards || []).length) st.board = 0;
+    render();
+    showStatus();
+  }
+  function isNew(bi, ti, sg) { var t = st.changed[bi + ':' + ti + '|' + sg]; return t && Date.now() - t < 2 * 60000; }
+
+  // ---------- Drawing ----------
+  function render() {
+    var d = st.data;
+    if (!d || !(d.boards || []).length) { stop('Display', 'No boards are picked for this display yet.'); return; }
+    var bi = st.board, item = d.boards[bi], b = item.board, now = new Date();
+    var layout = { one: 1, two: 2, three: 3, four: 4, side: 2 }[b.layout] ? b.layout : 'one';
+    var msgs = d.messages || [];
+    app.innerHTML = '<div class="screen">' +
+      '<div class="hd"><img src="' + PATCH + '" alt="" onerror="this.style.visibility=\'hidden\'">' +
+        '<div><div class="dept">' + esc(DEPT) + '</div><div class="bname">' + esc(b.name) + '</div></div>' +
+        '<div class="right"><div class="clock" id="clk">' + hm(now) + '</div><div class="date">' + esc(longDate(now)) + '</div>' +
+          '<div class="wx" id="wx">' + wxText() + '</div></div></div>' +
+      '<div class="body l-' + layout + '">' + b.tiles.map(function (t, ti) { return tileHtml(t, bi, ti); }).join('') + '</div>' +
+      (b.ticker && msgs.length ? '<div class="tick"><span id="tick">' + msgs.map(esc).join('   •   ') + '</span></div>' : '<div></div>') +
+      '</div>';
+    var tk = document.getElementById('tick');
+    if (tk) tk.style.animationDuration = Math.max(15, tk.textContent.length * 0.25) + 's';
+    startScrolls();
+  }
+
+  function tileHtml(t, bi, ti) {
+    var titles = { onduty: 'On duty', staffing: 'Staffing', off: 'Off today', cruisers: 'Cruisers', training: 'Training', overlaps: 'Overlaps to review', message: 'Notice', clock: '' };
+    var title = t.title || titles[t.type] || '';
+    var sub = t.squad && (t.type === 'onduty' || t.type === 'staffing' || t.type === 'off') ? t.squad : '';
+    var inner = '';
+    if (t.type === 'onduty') {
+      inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' : '<div class="shifts">' + (t.shifts || []).map(function (s) {
+        return '<div class="shift' + (s.key === t.now ? ' now' : '') + '"><h3>' + esc(s.label.replace(/\s*squad\s*\w+/i, '').replace(/\s+\d{1,2}\/\d{1,2}(\/\d+)?$/, '')) + '</h3>' +
+          (s.rows.length ? s.rows.map(function (x) {
+            var extra = [x.u, x.d].filter(Boolean).join(' · ');
+            return '<div class="pr ' + esc(x.t) + (isNew(bi, ti, s.key + '|' + rowSig(x)) ? ' chg' : '') + '"><span class="cs">' + esc(x.cs || '·') + '</span>' +
+              '<span class="nm">' + esc(x.n) + (x.h ? '<small>' + esc(x.h) + '</small>' : '') + '</span><span class="ex">' + esc(extra) + '</span></div>';
+          }).join('') : '<p class="empty">No one listed</p>') + '</div>';
+      }).join('') + '</div>';
+    } else if (t.type === 'staffing') {
+      inner = '<div class="stf">' + (t.lines || []).map(function (l) {
+        return '<div class="stc' + (l.short ? ' short' : '') + (l.key === t.now ? ' now' : '') + '"><b>' + esc(l.name) + '</b><span class="num">' + l.on + '</span>' +
+          '<span class="txt">' + esc(l.text || (l.on + ' on the roster')) + (l.ot ? ' · ' + l.ot + ' on overtime' : '') + '</span></div>';
+      }).join('') + '</div>';
+    } else if (t.type === 'off') {
+      inner = (t.rows || []).length ? (t.rows || []).map(function (x) {
+        return '<div class="li' + (isNew(bi, ti, JSON.stringify(x)) ? ' chg' : '') + '"><b>' + esc(x.n) + '</b>' + (x.cs ? ' <span class="sub">' + esc(x.cs) + '</span>' : '') +
+          '<div class="sub">' + esc([x.why, x.shift].filter(Boolean).join(' · ')) + '</div></div>';
+      }).join('') : '<p class="empty">No one marked off.</p>';
+    } else if (t.type === 'cruisers') {
+      inner = '<div class="day">Out of service (' + (t.out || []).length + ')</div>' +
+        ((t.out || []).length ? t.out.map(function (c) { return '<div class="li oos"><b>' + esc(c.v) + '</b> <span class="sub">' + esc([c.why, c.since ? 'since ' + c.since : ''].filter(Boolean).join(' · ')) + '</span></div>'; }).join('')
+          : '<p class="empty">All in service.</p>') +
+        '<div class="day" style="margin-top:.8em">In use' + (t.shift ? ' · ' + esc(t.shift.replace(/\s*squad\s*\w+/i, '').replace(/\s+\d{1,2}\/\d{1,2}(\/\d+)?$/, '')) : '') + '</div>' +
+        ((t.inUse || []).length ? '<div class="chips">' + t.inUse.map(function (c) { return '<span class="chip"><b>' + esc(c.u) + '</b>' + esc(c.n) + '</span>'; }).join('') + '</div>' : '<p class="empty">None listed.</p>');
+    } else if (t.type === 'training') {
+      var last = '';
+      inner = (t.rows || []).length ? (t.rows || []).map(function (x) {
+        var head = x.date !== last ? '<div class="day">' + esc(dayLabel(x.date)) + '</div>' : '';
+        last = x.date;
+        var count = x.kind === 'class' ? x.n + ' of ' + x.seats + ' signed up' : x.n ? x.n + ' signed in' : '';
+        return head + '<div class="li"><b>' + esc(x.title) + '</b><div class="sub">' + esc([times(x), x.where, count].filter(Boolean).join(' · ')) + '</div></div>';
+      }).join('') : '<p class="empty">No training scheduled.</p>';
+    } else if (t.type === 'overlaps') {
+      inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' :
+        '<div class="big' + (t.n ? ' bad' : '') + '">' + (t.n || 0) + '</div><div class="sub" style="margin:.2em 0 .6em">' + (t.n === 1 ? 'overlap needs a look' : 'overlaps need a look') + '</div>' +
+        (t.list || []).map(function (x) { return '<div class="li"><b>' + esc(x.who) + '</b><div class="sub">' + esc([x.what, x.when].filter(Boolean).join(' · ')) + '</div></div>'; }).join('');
+    } else if (t.type === 'message') {
+      var list = t.list || [];
+      inner = list.length ? '<div class="msg" data-rot="' + list.length + '">' + list.map(function (m, i) { return '<div' + (i ? ' hidden' : '') + '>' + esc(m) + '</div>'; }).join('') + '</div>'
+        : '<p class="empty">No notices right now.</p>';
+    } else if (t.type === 'clock') {
+      var n = new Date();
+      inner = '<div class="bigclock"><div class="t" data-clk="1">' + hm(n) + '</div><div class="d">' + esc(longDate(n)) + '</div><div class="w" data-wx="1">' + wxText(true) + '</div></div>';
+    }
+    return '<section class="tile">' + (title ? '<h2>' + esc(title) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</h2>' : '') +
+      '<div class="in"><div class="scroll">' + inner + '</div></div></section>';
+  }
+
+  // Lists too long for their panel scroll slowly down, pause, and come back up.
+  var scrollers = [];
+  function startScrolls() {
+    scrollers.forEach(function (s) { clearTimeout(s.t); });
+    scrollers = [];
+    document.querySelectorAll('.tile .in').forEach(function (box) {
+      var inner = box.firstChild, extra = inner.scrollHeight - box.clientHeight;
+      if (extra <= 4) return;
+      var s = { t: 0 }, speed = 28; // pixels a second
+      var go = function (down) {
+        var dist = down ? extra : 0, secs = extra / speed;
+        inner.style.transition = 'transform ' + secs + 's linear';
+        inner.style.transform = 'translateY(' + (-dist) + 'px)';
+        s.t = setTimeout(function () { go(!down); }, secs * 1000 + 5000);
+      };
+      s.t = setTimeout(function () { go(true); }, 6000);
+      scrollers.push(s);
+    });
+  }
+
+  // ---------- Weather (National Weather Service) ----------
+  function wxText(big) {
+    var w = st.wx;
+    if (!w) return '';
+    return esc(w.temp + '°' + (big ? ' ' + w.text : ' · ' + w.text));
+  }
+  function loadWx() {
+    fetch('https://api.weather.gov/points/' + LAT + ',' + LON).then(function (r) { return r.json(); })
+      .then(function (p) { return fetch(p.properties.forecastHourly).then(function (r) { return r.json(); }); })
+      .then(function (f) {
+        var x = f.properties.periods[0];
+        st.wx = { temp: x.temperature, text: x.shortForecast };
+        var el = document.getElementById('wx'); if (el) el.innerHTML = wxText();
+        document.querySelectorAll('[data-wx]').forEach(function (e) { e.innerHTML = wxText(true); });
+      }).catch(function () {});
+  }
+
+  // ---------- Clock, rotation, messages ----------
+  setInterval(function () {
+    var n = new Date();
+    var c = document.getElementById('clk'); if (c) c.textContent = hm(n);
+    document.querySelectorAll('[data-clk]').forEach(function (e) { e.textContent = hm(n); });
+    // Next board when its time is up.
+    var d = st.data;
+    if (d && d.boards && d.boards.length > 1) {
+      var secs = d.boards[st.board].secs || 30;
+      if (!st.boardAt) st.boardAt = Date.now();
+      if (Date.now() - st.boardAt >= secs * 1000) { st.board = (st.board + 1) % d.boards.length; st.boardAt = Date.now(); render(); }
+    }
+    showStatus();
+  }, 1000);
+  setInterval(function () {
+    document.querySelectorAll('[data-rot]').forEach(function (box) {
+      var kids = box.children; if (kids.length < 2) return;
+      var i = 0; for (; i < kids.length; i++) if (!kids[i].hidden) break;
+      kids[i % kids.length].hidden = true; kids[(i + 1) % kids.length].hidden = false;
+    });
+  }, 12000);
+
+  // A copy kept on the TV, so it shows something right away after a restart.
+  var saved = store.get('oid-box-' + id);
+  if (saved) LOCK.open(saved).then(function (p) { if (!st.data) take(p); }, function () {});
+  load();
+  setInterval(load, POLL);
+  loadWx();
+  setInterval(loadWx, 30 * 60000);
+  // A daily reload picks up page updates.
+  setTimeout(function () { location.reload(); }, (24 * 3600 - 300 + Math.random() * 600) * 1000);
+})();
+</script>
+</body>
+</html>
