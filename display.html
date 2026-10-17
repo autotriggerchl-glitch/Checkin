@@ -649,6 +649,55 @@ var LOCK = (function () {
     return bits.length ? '<span class="meta">' + bits.join('') + '</span>' : '';
   }
 
+  // A "Not signed up" panel (only Still-needs-it lists) would repeat the same
+  // training and the same officers once per session. Show each training once,
+  // with its dates on one line, and each officer once: those not signed up for
+  // any of its sessions.
+  function missingOnly(rows) {
+    var any = false;
+    var ok = (rows || []).every(function (x) {
+      return !x.ppl || Object.keys(x.ppl).every(function (k) {
+        var L = x.ppl[k];
+        if (k === 'missing' && L && L.length) any = true;
+        return k === 'missing' || !L || !L.length;
+      });
+    });
+    return ok && any;
+  }
+  function missingHtml(rows, o) {
+    var info = list(o, 'info', ['time', 'where', 'count']);
+    var groups = [], byTitle = {};
+    rows.forEach(function (x) {
+      var key = String(x.title || '').trim().toLowerCase();
+      var g = byTitle[key];
+      if (!g) { g = byTitle[key] = { title: x.title, sessions: [], who: null, order: [] }; groups.push(g); }
+      g.sessions.push(x);
+      var L = (x.ppl && x.ppl.missing) || [], here = {};
+      L.forEach(function (p) {
+        var id = (p.c || '') + '|' + p.n;
+        here[id] = p;
+        if (!g.who) g.order.push(id);
+      });
+      if (!g.who) g.who = here;
+      else Object.keys(g.who).forEach(function (id) { if (!here[id]) delete g.who[id]; });
+    });
+    var out = groups.map(function (g) {
+      var ppl = g.order.filter(function (id) { return g.who[id]; }).map(function (id) { return g.who[id]; });
+      if (!ppl.length) return '';
+      var t0 = times(g.sessions[0]);
+      var same = g.sessions.every(function (s) { return times(s) === t0; });
+      var dates = g.sessions.map(function (s) {
+        return dayLabel(s.date) + (!same && info.indexOf('time') >= 0 && times(s) ? ' ' + times(s) : '');
+      }).filter(function (d, i, a) { return a.indexOf(d) === i; });
+      var where = g.sessions.map(function (s) { return s.where; }).filter(function (w, i, a) { return w && a.indexOf(w) === i; });
+      var sub = [dates.join(', '), same && info.indexOf('time') >= 0 ? t0 : '', info.indexOf('where') >= 0 ? where.join(' / ') : ''].filter(Boolean).join(' · ');
+      return '<div class="li"><b>' + esc(g.title) + '</b>' + (sub ? '<div class="sub">' + esc(sub) + '</div>' : '') +
+        '<div class="ppl miss"><b>Still needs it (' + ppl.length + ')</b>' + ppl.map(function (p) {
+          return '<span class="chip' + (p.s === 'never' ? ' never' : '') + '">' + (p.c ? '<i>' + esc(p.c) + '</i>' : '') + esc(p.n) + '</span>'; }).join('') + '</div></div>';
+    }).join('');
+    return out || '<p class="empty">Everyone is signed up.</p>';
+  }
+
   function tileHtml(t, bi, ti) {
     var titles = { onduty: "Who's working", staffing: 'Staffing', off: 'Off today', cruisers: 'Cruisers', training: 'Upcoming training',
       overlaps: 'Overlaps to review', message: 'Notice', clock: '', feed: 'Latest changes', ready: 'Training readiness' };
@@ -698,7 +747,8 @@ var LOCK = (function () {
         }).join('') + '</div>' : '<p class="empty">No cruisers listed on the roster.</p>';
     } else if (t.type === 'training') {
       var last = '';
-      inner = (t.rows || []).length ? (t.rows || []).map(function (x) {
+      if (missingOnly(t.rows)) inner = missingHtml(t.rows, o);
+      else inner = (t.rows || []).length ? (t.rows || []).map(function (x) {
         var head = x.date !== last ? '<div class="day">' + esc(dayLabel(x.date)) + '</div>' : '';
         last = x.date;
         var info = list(o, 'info', ['time', 'where', 'count']);
