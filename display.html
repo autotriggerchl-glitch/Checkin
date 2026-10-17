@@ -66,7 +66,7 @@
   .stl { margin: .15em 0 .35em; font-weight: 700; font-size: .92em; color: var(--muted); }
   .stl.ok { color: var(--ok); } .stl.bad { color: var(--err); }
   .pr, .ph { --c-cs: 4.2em; --c-hr: 7.6em; --c-cr: 4em; --c-pat: minmax(0, .75fr); --c-duty: 5.6em; --c-brk: 4em;
-    display: grid; grid-template-columns: var(--c-cs) minmax(0, 1fr) var(--c-hr) var(--c-cr) var(--c-pat) var(--c-duty) var(--c-brk); align-items: center; }
+    display: grid; grid-template-columns: var(--c-cs) minmax(11em, 1.8fr) var(--c-hr) var(--c-cr) var(--c-pat) var(--c-duty) var(--c-brk); align-items: center; }
   .pr > *, .ph > * { padding-right: .6em; min-width: 0; }
   .pr > .cs, .ph > .cs { padding-right: 0; margin-right: .6em; }
   .ph { color: var(--muted); font-size: .72em; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 0 .4em .15em; }
@@ -75,8 +75,13 @@
   .pr.sup .cs { background: var(--gold); color: #1B1405; }
   .pr.on .cs::after { content: ""; position: absolute; right: -.25em; top: -.25em; width: .55em; height: .55em; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 .12em var(--panel); }
   .pr .who { min-width: 0; display: flex; align-items: baseline; gap: .45em; overflow: hidden; }
-  .pr .nm { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pr .rk { color: var(--muted); font-size: .8em; white-space: nowrap; }
+  .pr .nm { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+  .pr .who .pill { flex: none; }
+  .pr .rk { color: var(--muted); font-size: .8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 100 auto; min-width: 0; }
+  /* Group labels inside a shift: Supervisors, Patrol, Overtime, Off */
+  .pg { margin: .55em 0 .1em; padding: 0 .4em; color: var(--muted); font-weight: 700; font-size: .82em; }
+  .pg span { display: inline-block; min-width: 1.5em; text-align: center; margin-left: .3em; border-radius: 1em; background: var(--panel2); color: var(--ink); font-size: .9em; }
+  .ph + .pg { margin-top: .1em; }
   .pill { flex: none; border-radius: .3em; padding: 0 .4em; font-size: .78em; font-weight: 800; white-space: nowrap; }
   .pill.ot { background: var(--err); color: #2A0503; }
   .pill.lv { background: var(--warn); color: #2A1C00; }
@@ -97,7 +102,8 @@
   .no-rank .rk { display: none; }
   .no-dot .pr.on .cs::after { display: none; }
   /* Text size picked in the board editor */
-  .tile.sz-l .in { font-size: 1.25em; } .tile.sz-xl .in { font-size: 1.55em; } .tile.sz-s .in { font-size: .85em; }
+  .tile.sz-l { font-size: 1.25em; } .tile.sz-xl { font-size: 1.55em; } .tile.sz-s { font-size: .85em; }
+  .tile.sz-l > h2, .tile.sz-xl > h2 { font-size: .95em; }
   /* Training: who's signed in */
   .ppl { margin: .2em 0 .1em; display: flex; flex-wrap: wrap; gap: .3em; align-items: baseline; }
   .ppl > b { color: var(--muted); font-size: .8em; text-transform: uppercase; letter-spacing: .05em; margin-right: .2em; }
@@ -112,9 +118,9 @@
   .pr.st-part { background: linear-gradient(90deg, var(--lv-bg) 0 50%, transparent 50%); border-left-color: var(--warn); }
   .pr.st-part.st-part-ot { background: linear-gradient(90deg, var(--lv-bg) 0 50%, var(--ot-bg) 50%); }
   /* Narrow panels drop the smaller columns first. */
-  @container (max-width: 44em) { .pr, .ph { --c-duty: 0px; } .pr .duty, .ph .duty { display: none; } }
-  @container (max-width: 36em) { .pr, .ph { --c-brk: 0px; } .pr .brk, .ph .brk { display: none; } .pr .rk { display: none; } }
-  @container (max-width: 28em) { .pr, .ph { --c-pat: 0px; } .pr .pat, .ph .pat { display: none; } }
+  @container (max-width: 54em) { .pr, .ph { --c-duty: 0px; } .pr .duty, .ph .duty { display: none; } }
+  @container (max-width: 46em) { .pr, .ph { --c-brk: 0px; } .pr .brk, .ph .brk { display: none; } .pr .rk { display: none; } }
+  @container (max-width: 38em) { .pr, .ph { --c-pat: 0px; } .pr .pat, .ph .pat { display: none; } }
   .chg { animation: flash 2s ease-in-out 0s 8; }
   @keyframes flash { 0%, 100% { box-shadow: none; } 50% { box-shadow: inset 0 0 0 999px rgba(242, 181, 68, .3); } }
   /* Staffing */
@@ -354,7 +360,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-17a';
+  var PAGE_VERSION = '2026-10-17b';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -542,6 +548,25 @@ var LOCK = (function () {
   }
   function staffCls(text) { return /not\s*met|below|short|under|need|hire/i.test(text) ? 'bad' : /met|full/i.test(text) ? 'ok' : ''; }
   // Duty P (patrol) is everyone's usual, so the column shows only the others (FTO, Desk...).
+  // Like the duty sheet: Supervisors (on their own tour or supervisor coverage), Patrol
+  // (a sergeant on patrol overtime sits here), Overtime, then anyone off. Each group by call sign.
+  function byCall(a, b) {
+    return String(a.cs || '~').localeCompare(String(b.cs || '~'), undefined, { numeric: true }) || String(a.n).localeCompare(String(b.n));
+  }
+  function orderRows(rows, how) {
+    if (how === 'sheet') return rows;
+    var groups = [['Supervisors', function (x) { return !x.a && x.t === 'sup'; }], ['Patrol', function (x) { return !x.a && x.t !== 'sup' && x.t !== 'ot'; }],
+      ['Overtime', function (x) { return !x.a && x.t === 'ot'; }], ['Off', function (x) { return x.a; }]];
+    var out = [];
+    groups.forEach(function (g) {
+      var L = rows.filter(g[1]);
+      if (how !== 'groupsheet') L = L.slice().sort(byCall);
+      if (!L.length) return;
+      out.push({ grp: g[0], n: L.length });
+      out = out.concat(L);
+    });
+    return out;
+  }
   function dutyText(d) { d = String(d || '').trim(); return /^(p|patrol)$/i.test(d) ? '' : d; }
   function personRow(x, cls, cols) {
     cols = cols || [];
@@ -580,7 +605,9 @@ var LOCK = (function () {
           '<h3><span class="nm">' + esc(SHIFT_NAMES[s.key] || s.label) + '</span>' + (head.indexOf('count') >= 0 ? '<span class="cnt">' + s.present + ' present' + (s.absent ? ' · ' + s.absent + ' off' : '') + '</span>' : '') + '</h3>' +
           (s.staffing && head.indexOf('staff') >= 0 ? '<div class="stl ' + staffCls(s.staffing) + '">' + esc(s.staffing) + '</div>' : '') +
           (s.rows.length ? (head.indexOf('cols') >= 0 ? '<div class="ph"><span class="cs">Call</span><span>Name</span><span class="hr">Hours</span><span class="cr">Car</span><span class="pat">Patrol</span><span class="duty">Duty</span><span class="brk">Break</span></div>' : '') +
-            s.rows.map(function (x) { return personRow(x, isNew(bi, ti, s.key + '|' + rowSig(x)) ? ' chg' : '', cols); }).join('')
+            orderRows(s.rows, o.order).map(function (x) {
+              return x.grp ? '<div class="pg">' + esc(x.grp) + ' <span>' + x.n + '</span></div>' : personRow(x, isNew(bi, ti, s.key + '|' + rowSig(x)) ? ' chg' : '', cols);
+            }).join('')
             : '<p class="empty">No one listed</p>') + '</div>';
       }).join('') + '</div>';
     } else if (t.type === 'staffing') {
