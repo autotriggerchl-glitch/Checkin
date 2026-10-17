@@ -354,6 +354,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
+  var PAGE_VERSION = '2026-10-17a';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -420,6 +421,12 @@ var LOCK = (function () {
   // Remember what each list showed, to flash what changed.
   function rowSig(x) { return [x.n, x.cs, x.u, x.d, x.p, x.h, x.b, x.a, x.ot, (x.dts || []).join(',')].join('|'); }
   function take(payload) {
+    // The Duty Roster expects a newer page: reload to get it (at most every 10 minutes,
+    // in case GitHub is still handing out the old copy).
+    if (payload.page && payload.page !== PAGE_VERSION && !PREVIEW) {
+      var last = +(store.get('oid-reload-at') || 0);
+      if (Date.now() - last > 10 * 60000) { store.set('oid-reload-at', String(Date.now())); location.reload(); return; }
+    }
     var first = !st.data;
     st.data = payload;
     var now = Date.now();
