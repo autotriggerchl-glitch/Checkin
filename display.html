@@ -404,7 +404,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-17e';
+  var PAGE_VERSION = '2026-10-17f';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -611,6 +611,38 @@ var LOCK = (function () {
     });
     return out;
   }
+  // The same class on several days shows once, with its dates listed
+  // ("Mon 10/19, Thu 10/22, Fri 10/23") and one list of who still needs it.
+  function combineDates(rows) {
+    var out = [], by = {};
+    rows.forEach(function (x) {
+      var k = x.kind + '|' + String(x.title).toLowerCase().trim();
+      var g = by[k];
+      if (!g) {
+        g = by[k] = { title: x.title, kind: x.kind, other: x.other, cat: x.cat, date: x.date, dates: [], starts: {}, wheres: {}, n: 0, seats: 0, ppl: null };
+        out.push(g);
+      }
+      if (g.dates.indexOf(x.date) < 0) g.dates.push(x.date);
+      g.starts[times(x)] = 1; g.wheres[x.where || ''] = 1;
+      g.n += x.n || 0; g.seats += x.seats || 0;
+      if (x.ppl) {
+        g.ppl = g.ppl || {};
+        Object.keys(x.ppl).forEach(function (role) {
+          var L = g.ppl[role] = g.ppl[role] || [];
+          x.ppl[role].forEach(function (p) {
+            if (!L.some(function (q) { return q.n === p.n && q.c === p.c; })) L.push(p);
+          });
+        });
+      }
+    });
+    out.forEach(function (g) {
+      var st = Object.keys(g.starts), wh = Object.keys(g.wheres);
+      g.start = st.length === 1 ? st[0] : ''; g.end = '';   // the time shows only when every day has the same one
+      g.where = wh.length === 1 ? wh[0] : '';
+      delete g.starts; delete g.wheres;
+    });
+    return out;
+  }
   function dutyText(d) { d = filled(d); return /^(p|patrol|a|ot)$/i.test(d) ? '' : d; }
   // "----" or "--" on the sheet means nothing there.
   function filled(v) { v = String(v == null ? '' : v).trim(); return /^[-–—_.\s]*$/.test(v) ? '' : v; }
@@ -697,13 +729,14 @@ var LOCK = (function () {
           return '<div class="car ' + x.s + (isNew(bi, ti, JSON.stringify(x)) ? ' chg' : '') + '"><div class="v">' + esc(x.v) + '</div><div class="w">' + esc(w) + '</div></div>';
         }).join('') + '</div>' : '<p class="empty">No cruisers listed on the roster.</p>';
     } else if (t.type === 'training') {
-      var last = '';
-      inner = (t.rows || []).length ? (t.rows || []).map(function (x) {
-        var head = x.date !== last ? '<div class="day">' + esc(dayLabel(x.date)) + '</div>' : '';
+      var last = '', combine = o.group !== 'each';
+      var trows = combine ? combineDates(t.rows || []) : (t.rows || []);
+      inner = trows.length ? trows.map(function (x) {
+        var head = !combine && x.date !== last ? '<div class="day">' + esc(dayLabel(x.date)) + '</div>' : '';
         last = x.date;
         var info = list(o, 'info', ['time', 'where', 'count']);
         var count = x.kind === 'class' ? x.n + ' of ' + x.seats + ' signed up' : x.n ? x.n + ' signed in' : '';
-        var sub = [info.indexOf('time') >= 0 ? times(x) : '', info.indexOf('where') >= 0 ? x.where : '', info.indexOf('count') >= 0 ? count : ''].filter(Boolean).join(' · ');
+        var sub = [combine ? x.dates.map(dayLabel).join(', ') : '', info.indexOf('time') >= 0 ? times(x) : '', info.indexOf('where') >= 0 ? x.where : '', info.indexOf('count') >= 0 ? count : ''].filter(Boolean).join(' · ');
         var groups = [['instructor', 'Instructors'], ['officer', x.kind === 'class' ? 'Signed up' : 'Attendees'], ['roleplayer', 'Role players'], ['other', x.other || 'Other'], ['missing', 'Still needs it']];
         var ppl = x.ppl ? groups.map(function (g) {
           var L = x.ppl[g[0]];
