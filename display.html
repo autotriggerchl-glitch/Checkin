@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Cache-Control" content="no-cache">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CPD Board">
 <title>Department display</title>
 <script src="config.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -321,6 +325,13 @@
   .t-blues.dark .shift > h3 { background: #2B4677; }
   .t-blues.dark .shift.now { border-color: #C9A44B; }
   .t-blues.dark .shift.now > h3 { background: #8E7230; }
+  /* Reload button: only on phones and tablets (a TV has no finger to tap it). */
+  .rl { display: none; }
+  @media (hover: none) and (pointer: coarse) {
+    .hd .right { position: relative; }
+    .rl { display: inline-grid; place-items: center; float: left; margin: .2em .6em 0 0; width: 2.2em; height: 2.2em; border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.35); background: transparent; color: inherit; font-size: 1.1em; cursor: pointer; }
+  }
 </style>
 </head>
 <body class="t-blues">
@@ -404,7 +415,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-17f';
+  var PAGE_VERSION = '2026-10-17g';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -436,6 +447,10 @@ var LOCK = (function () {
   function times(x) { return x.start ? x.start + (x.end ? '–' + x.end : '') : ''; }
   // A checkbox list from the board editor. Not set = the default; "-" = none.
   function list(o, k, def) { var v = (o || {})[k]; if (v == null || v === '') return def; if (v === '-') return []; return String(v).split(','); }
+  // Load the page again from GitHub, never from the phone's saved copy.
+  function freshLoad(tag) {
+    location.replace(location.pathname + '?d=' + encodeURIComponent(id) + '&v=' + encodeURIComponent(tag || Date.now()) + location.hash);
+  }
   function portrait() { return window.matchMedia && matchMedia('(max-aspect-ratio: 1/1)').matches; }
 
   // ---------- Getting the data ----------
@@ -475,7 +490,8 @@ var LOCK = (function () {
     // in case GitHub is still handing out the old copy).
     if (payload.page && payload.page !== PAGE_VERSION && !PREVIEW) {
       var last = +(store.get('oid-reload-at') || 0);
-      if (Date.now() - last > 10 * 60000) { store.set('oid-reload-at', String(Date.now())); location.reload(); return; }
+      // A new address each time, so phones (and home-screen icons) can't hand back their saved copy.
+      if (q.get('v') !== payload.page || Date.now() - last > 10 * 60000) { store.set('oid-reload-at', String(Date.now())); freshLoad(payload.page); return; }
     }
     var first = !st.data;
     st.data = payload;
@@ -515,13 +531,15 @@ var LOCK = (function () {
     app.innerHTML = '<div class="screen">' +
       '<div class="hd"><img src="' + PATCH + '" alt="" onerror="this.style.visibility=\'hidden\'">' +
         '<div style="min-width:0"><div class="dept">' + esc(DEPT) + '</div><div class="bname">' + esc(b.name) + '</div></div>' +
-        '<div class="right"><div class="clock" id="clk">' + hm(now) + '</div><div class="date">' + esc(longDate(now)) + '</div>' +
+        '<div class="right"><button type="button" class="rl" id="rl" aria-label="Reload">↻</button><div class="clock" id="clk">' + hm(now) + '</div><div class="date">' + esc(longDate(now)) + '</div>' +
           '<div class="wx" id="wx">' + wxText() + '</div></div></div>' +
       '<div id="wxa">' + wxAlertHtml() + '</div>' +
       (b.banner ? bannerHtml(b.banner) : '<div></div>') +
       '<div class="body l-' + layout + '">' + b.tiles.map(function (t, ti) { return tileHtml(t, bi, ti); }).join('') + '</div>' +
       (b.ticker && msgs.length ? '<div class="tick"><span id="tick">' + msgs.map(esc).join('   •   ') + '</span></div>' : '<div></div>') +
       '</div>';
+    var rl = document.getElementById('rl');
+    if (rl) rl.onclick = function () { freshLoad(); };
     var tk = document.getElementById('tick');
     if (tk) tk.style.animationDuration = Math.max(15, tk.textContent.length * 0.25) + 's';
     startScrolls();
@@ -900,7 +918,7 @@ var LOCK = (function () {
   loadWxAlerts();
   setInterval(loadWxAlerts, 5 * 60000);
   // A daily reload picks up page updates.
-  setTimeout(function () { location.reload(); }, (24 * 3600 - 300 + Math.random() * 600) * 1000);
+  setTimeout(function () { freshLoad(); }, (24 * 3600 - 300 + Math.random() * 600) * 1000);
 })();
 </script>
 </body>
