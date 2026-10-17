@@ -58,14 +58,14 @@
   .empty { color: var(--muted); padding: 1em 0; }
   /* Who's working: reads like the duty sheet */
   .shifts { display: grid; grid-template-columns: repeat(auto-fit, minmax(30em, 1fr)); gap: .4em 1.2em; }
-  .shift { margin-bottom: .6em; min-width: 0; }
+  .shift { margin-bottom: .6em; min-width: 0; container-type: inline-size; }
   .shift > h3 { margin: 0; font-size: 1.05em; display: flex; justify-content: space-between; align-items: center; gap: .6em; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
   .shift > h3 .cnt { text-transform: none; letter-spacing: 0; font-weight: 600; font-size: .85em; }
   .shift.now > h3 .nm { color: var(--ok); }
   .shift.now > h3 .nm::after { content: "NOW"; margin-left: .5em; background: var(--ok); color: #062512; border-radius: .3em; padding: 0 .4em; font-size: .8em; }
   .stl { margin: .15em 0 .35em; font-weight: 700; font-size: .92em; color: var(--muted); }
   .stl.ok { color: var(--ok); } .stl.bad { color: var(--err); }
-  .pr, .ph { --c-cs: 4.2em; --c-hr: 7.6em; --c-cr: 4em; --c-pat: minmax(0, .75fr); --c-duty: 5.6em; --c-brk: 4em;
+  .pr, .ph { --c-cs: 4.2em; --c-hr: 7.6em; --c-cr: 4em; --c-pat: minmax(5.5em, .9fr); --c-duty: 5.6em; --c-brk: 4em;
     display: grid; grid-template-columns: var(--c-cs) minmax(11em, 1.8fr) var(--c-hr) var(--c-cr) var(--c-pat) var(--c-duty) var(--c-brk); align-items: center; }
   .pr > *, .ph > * { padding-right: .6em; min-width: 0; }
   .pr > .cs, .ph > .cs { padding-right: 0; margin-right: .6em; }
@@ -118,9 +118,21 @@
   .pr.st-part { background: linear-gradient(90deg, var(--lv-bg) 0 50%, transparent 50%); border-left-color: var(--warn); }
   .pr.st-part.st-part-ot { background: linear-gradient(90deg, var(--lv-bg) 0 50%, var(--ot-bg) 50%); }
   /* Narrow panels drop the smaller columns first. */
-  @container (max-width: 54em) { .pr, .ph { --c-duty: 0px; } .pr .duty, .ph .duty { display: none; } }
-  @container (max-width: 46em) { .pr, .ph { --c-brk: 0px; } .pr .brk, .ph .brk { display: none; } .pr .rk { display: none; } }
-  @container (max-width: 38em) { .pr, .ph { --c-pat: 0px; } .pr .pat, .ph .pat { display: none; } }
+  /* A shift too narrow for every column: each person on two lines instead
+     (call sign, name and hours; then car, patrol, duty and break). */
+  @container (max-width: 46em) {
+    .ph { display: none; }
+    .pr { grid-template-columns: 3.6em minmax(0, 1fr) auto; grid-template-areas: "cs who hr" "cs meta meta"; row-gap: .1em; align-items: center; }
+    .pr > .cs { grid-area: cs; align-self: start; margin: .1em .6em 0 0; }
+    .pr > .who { grid-area: who; } .pr > .hr { grid-area: hr; text-align: right; padding-right: 0; }
+    .pr > .cr, .pr > .pat, .pr > .duty, .pr > .brk { display: none !important; }
+    .pr > .meta { grid-area: meta; display: flex; flex-wrap: wrap; gap: .15em .9em; font-size: .88em; color: var(--muted); }
+    .pr .meta b { color: var(--ink); font-weight: 600; }
+    .pr .meta i { font-style: normal; opacity: .8; }
+    .pr .hr .lv { white-space: nowrap; }
+    .pr.st-part { background: linear-gradient(180deg, var(--lv-bg) 0 100%); }
+    .pr .rk { display: none; }
+  }
   .chg { animation: flash 2s ease-in-out 0s 8; }
   @keyframes flash { 0%, 100% { box-shadow: none; } 50% { box-shadow: inset 0 0 0 999px rgba(242, 181, 68, .3); } }
   /* Staffing */
@@ -291,6 +303,24 @@
   .t-blues.dark .fd .t { color: #D4B25A; }
   .t-blues.dark .wxa.minor { background: #6B4A06; color: #fff; border: 0; }
   .t-blues.dark .tick { background: #C9A44B; color: #1B1405; }
+
+  /* Each shift is its own block with a solid heading bar, so Day Watch, First Half
+     and Last Half don't run together. */
+  .t-blues .shift { background: var(--panel); border: 1px solid var(--line); border-radius: .5em; overflow: hidden; margin-bottom: 1.1em; }
+  .t-blues .shift > h3 { background: #14284B; color: #fff; padding: .45em .75em; margin: 0; font-size: 1.15em; }
+  .t-blues .shift > h3 .cnt { color: #C9D4E8; }
+  .t-blues .shift.now { border: 2px solid #9C7A22; }
+  .t-blues .shift.now > h3 { background: #9C7A22; }
+  .t-blues .shift.now > h3 .nm { color: #fff; }
+  .t-blues .shift.now > h3 .nm::after { background: #fff; color: #6B5214; }
+  .t-blues .shift.now > h3 .cnt { color: #FFF4D6; }
+  .t-blues .shift > .stl { margin: 0; padding: .35em .75em; background: var(--panel2); border-bottom: 1px solid var(--line); }
+  .t-blues .shift > .ph, .t-blues .shift > .pg, .t-blues .shift > .pr, .t-blues .shift > .empty { margin-left: .35em; margin-right: .35em; }
+  .t-blues .shift > .ph { margin-top: .35em; }
+  .t-blues .shift > .pr:last-child { border-bottom: 0; margin-bottom: .3em; }
+  .t-blues.dark .shift > h3 { background: #2B4677; }
+  .t-blues.dark .shift.now { border-color: #C9A44B; }
+  .t-blues.dark .shift.now > h3 { background: #8E7230; }
 </style>
 </head>
 <body class="t-blues">
@@ -374,7 +404,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-17c';
+  var PAGE_VERSION = '2026-10-17d';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -581,7 +611,9 @@ var LOCK = (function () {
     });
     return out;
   }
-  function dutyText(d) { d = String(d || '').trim(); return /^(p|patrol|a|ot)$/i.test(d) ? '' : d; }
+  function dutyText(d) { d = filled(d); return /^(p|patrol|a|ot)$/i.test(d) ? '' : d; }
+  // "----" or "--" on the sheet means nothing there.
+  function filled(v) { v = String(v == null ? '' : v).trim(); return /^[-–—_.\s]*$/.test(v) ? '' : v; }
   function personRow(x, cls, cols) {
     cols = cols || [];
     var s = cardStatus(x);
@@ -598,10 +630,10 @@ var LOCK = (function () {
       '<span class="cs">' + esc(x.cs || '·') + '</span>' +
       '<span class="who"><span class="nm">' + esc(x.n) + '</span>' + (x.r ? '<span class="rk">' + esc(x.r) + '</span>' : '') + tags + '</span>' +
       '<span class="hr">' + hours + '</span>' +
-      '<span class="cr">' + esc(x.a ? '' : x.u || '') + '</span>' +
-      '<span class="pat">' + esc(x.a ? '' : x.p || '') + '</span>' +
+      '<span class="cr">' + esc(x.a ? '' : filled(x.u)) + '</span>' +
+      '<span class="pat">' + esc(x.a ? '' : filled(x.p)) + '</span>' +
       '<span class="duty">' + esc(x.a ? '' : dutyText(x.d)) + '</span>' +
-      '<span class="brk">' + esc(x.a ? '' : x.b || '') + '</span>' +
+      '<span class="brk">' + esc(x.a ? '' : filled(x.b)) + '</span>' +
       metaLine(x, cols) + '</div>';
   }
   // On a phone held upright the columns don't fit, so car, patrol, duty and break
@@ -610,10 +642,10 @@ var LOCK = (function () {
     if (x.a) return '';
     var on = function (c) { return cols.indexOf(c) >= 0; };
     var bits = [];
-    if (on('cr') && x.u) bits.push('<span><i>Car</i> ' + esc(x.u) + '</span>');
-    if (on('pat') && x.p) bits.push('<span><b>' + esc(x.p) + '</b></span>');
+    if (on('cr') && filled(x.u)) bits.push('<span><i>Car</i> ' + esc(filled(x.u)) + '</span>');
+    if (on('pat') && filled(x.p)) bits.push('<span><b>' + esc(filled(x.p)) + '</b></span>');
     if (on('duty') && dutyText(x.d)) bits.push('<span>' + esc(dutyText(x.d)) + '</span>');
-    if (on('brk') && x.b) bits.push('<span><i>Break</i> ' + esc(x.b) + '</span>');
+    if (on('brk') && filled(x.b)) bits.push('<span><i>Break</i> ' + esc(filled(x.b)) + '</span>');
     return bits.length ? '<span class="meta">' + bits.join('') + '</span>' : '';
   }
 
