@@ -217,7 +217,21 @@
     .tile .in { overflow: visible; }
     .shifts { grid-template-columns: 1fr; }
     .tick { position: sticky; bottom: 0; }
+    /* Each person on two lines: call sign, name and hours, then car, patrol, duty and break. */
+    .ph { display: none; }
+    .pr { grid-template-columns: 3.6em minmax(0, 1fr) auto; grid-template-areas: "cs who hr" "cs meta meta"; row-gap: .1em; align-items: center; }
+    .pr > .cs { grid-area: cs; align-self: start; margin: .1em .6em 0 0; }
+    .pr > .who { grid-area: who; } .pr > .hr { grid-area: hr; text-align: right; padding-right: 0; }
+    .pr > .cr, .pr > .pat, .pr > .duty, .pr > .brk { display: none !important; }
+    .pr > .meta { grid-area: meta; display: flex; flex-wrap: wrap; gap: .15em .9em; font-size: .88em; color: var(--muted); }
+    .pr .meta b { color: var(--ink); font-weight: 600; }
+    .pr .meta i { font-style: normal; opacity: .8; }
+    .pr .hr .lv { white-space: nowrap; }
+    .pr.st-part { background: linear-gradient(180deg, var(--lv-bg) 0 100%); }
+    .pr .rk { display: none; }
+    .status { left: 0; right: 0; bottom: 0; border-radius: 0; text-align: center; }
   }
+  .meta { display: none; }
   /* ===================== Dress Blues: light (the look for bright rooms) ===================== */
   body.t-blues {
     --bg: #E9EEF5; --panel: #FFFFFF; --panel2: #F3F6FA; --line: #CDD6E3; --ink: #12223F; --muted: #5B6B85;
@@ -360,7 +374,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-17b';
+  var PAGE_VERSION = '2026-10-17c';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -567,7 +581,7 @@ var LOCK = (function () {
     });
     return out;
   }
-  function dutyText(d) { d = String(d || '').trim(); return /^(p|patrol)$/i.test(d) ? '' : d; }
+  function dutyText(d) { d = String(d || '').trim(); return /^(p|patrol|a|ot)$/i.test(d) ? '' : d; }
   function personRow(x, cls, cols) {
     cols = cols || [];
     var s = cardStatus(x);
@@ -587,7 +601,20 @@ var LOCK = (function () {
       '<span class="cr">' + esc(x.a ? '' : x.u || '') + '</span>' +
       '<span class="pat">' + esc(x.a ? '' : x.p || '') + '</span>' +
       '<span class="duty">' + esc(x.a ? '' : dutyText(x.d)) + '</span>' +
-      '<span class="brk">' + esc(x.a ? '' : x.b || '') + '</span></div>';
+      '<span class="brk">' + esc(x.a ? '' : x.b || '') + '</span>' +
+      metaLine(x, cols) + '</div>';
+  }
+  // On a phone held upright the columns don't fit, so car, patrol, duty and break
+  // go on a second line under the name (only the ones ticked for the panel).
+  function metaLine(x, cols) {
+    if (x.a) return '';
+    var on = function (c) { return cols.indexOf(c) >= 0; };
+    var bits = [];
+    if (on('cr') && x.u) bits.push('<span><i>Car</i> ' + esc(x.u) + '</span>');
+    if (on('pat') && x.p) bits.push('<span><b>' + esc(x.p) + '</b></span>');
+    if (on('duty') && dutyText(x.d)) bits.push('<span>' + esc(dutyText(x.d)) + '</span>');
+    if (on('brk') && x.b) bits.push('<span><i>Break</i> ' + esc(x.b) + '</span>');
+    return bits.length ? '<span class="meta">' + bits.join('') + '</span>' : '';
   }
 
   function tileHtml(t, bi, ti) {
