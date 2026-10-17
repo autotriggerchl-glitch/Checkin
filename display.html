@@ -174,7 +174,8 @@
   .car.free .v { color: var(--muted); }
   .car.out { background: rgba(255, 107, 94, .2); border-color: var(--err); }
   .car.out .v { color: var(--err); }
-  .car.out { grid-column: span 2; }
+  .car.out, .car.det { grid-column: span 2; }
+  .car.det { background: #9C7A22; border-color: #9C7A22; } .car.det .v { color: #fff; } .car.det .w { color: #FFF4D6; font-weight: 600; }
   .car .w { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .car.out .w { color: #FFD3CE; font-weight: 600; }
   /* Change feed */
@@ -325,6 +326,8 @@
   .t-blues.dark .shift > h3 { background: #2B4677; }
   .t-blues.dark .shift.now { border-color: #C9A44B; }
   .t-blues.dark .shift.now > h3 { background: #8E7230; }
+  /* A cruiser out on a detail: brass */
+  .t-blues .car.det, .t-blues.dark .car.det { background: #9C7A22; border: 1px solid #9C7A22; } .t-blues .car.det .v { color: #fff; } .t-blues .car.det .w { color: #FFF4D6; font-weight: 600; }
   /* Reload button: only on phones and tablets (a TV has no finger to tap it). */
   .rl { display: none; }
   @media (hover: none) and (pointer: coarse) {
@@ -415,7 +418,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-17g';
+  var PAGE_VERSION = '2026-10-17h';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -739,10 +742,12 @@ var LOCK = (function () {
       sub = t.shift ? 'Now: ' + t.shift : '';
       var cshow = list(o, 'show', ['sum', 'out', 'use', 'free', 'why']);
       var cwho = o.who || 'cs';
-      var cars = (t.cars || []).filter(function (x) { return cshow.indexOf(x.s) >= 0; });
-      inner = cars.length ? (cshow.indexOf('sum') >= 0 ? '<div class="fl-sum"><span><b class="bad">' + (c.out || 0) + '</b> down</span><span><b>' + (c.use || 0) + '</b> in use</span><span><b>' + (c.free || 0) + '</b> free</span></div>' : '') +
+      var cars = (t.cars || []).filter(function (x) { return cshow.indexOf(x.s === 'det' ? 'use' : x.s) >= 0; });
+      inner = cars.length ? (cshow.indexOf('sum') >= 0 ? '<div class="fl-sum"><span><b class="bad">' + (c.out || 0) + '</b> down</span><span><b>' + (c.use || 0) + '</b> in use</span>' +
+        (c.det ? '<span><b>' + c.det + '</b> on detail</span>' : '') + '<span><b>' + (c.free || 0) + '</b> free</span></div>' : '') +
         '<div class="fl">' + cars.map(function (x) {
-          var w = x.s === 'out' ? (cshow.indexOf('why') >= 0 ? x.why || 'Out of service' : 'Out of service') : x.s === 'use' ? x.who.map(function (p) {
+          var w = x.s === 'det' ? 'Detail · ' + (cwho === 'name' ? x.det.n : cwho === 'both' ? [x.det.cs, x.det.n].filter(Boolean).join(' ') : x.det.cs || x.det.n) + (x.det.to ? ' til ' + x.det.to : '')
+            : x.s === 'out' ? (cshow.indexOf('why') >= 0 ? x.why || 'Out of service' : 'Out of service') : x.s === 'use' ? x.who.map(function (p) {
             return cwho === 'name' ? p.n : cwho === 'both' ? [p.cs, p.n].filter(Boolean).join(' ') : p.cs || p.n; }).join(', ') : 'Free';
           return '<div class="car ' + x.s + (isNew(bi, ti, JSON.stringify(x)) ? ' chg' : '') + '"><div class="v">' + esc(x.v) + '</div><div class="w">' + esc(w) + '</div></div>';
         }).join('') + '</div>' : '<p class="empty">No cruisers listed on the roster.</p>';
