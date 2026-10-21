@@ -361,6 +361,28 @@
   .oc-t { color: var(--muted); font-variant-numeric: tabular-nums; }
   .oc-day + .oc-day { margin-top: .4em; }
   .oc-none { padding: .3em 0; }
+  .ct-day + .ct-day { margin-top: .5em; }
+  .ct-n { background: var(--line); color: var(--ink); border-radius: 999px; padding: 0 .5em; font-size: .9em; letter-spacing: 0; }
+  .ct-grp { border-bottom: 1px solid var(--line); padding: .25em 0; }
+  .ct-h { display: flex; flex-wrap: wrap; gap: .1em 1em; color: var(--muted); font-size: .85em; }
+  .ct-h b { color: var(--ink); font-weight: 800; text-transform: uppercase; letter-spacing: .04em; font-size: .85em; margin-right: .2em; }
+  .ct { display: flex; align-items: baseline; flex-wrap: wrap; gap: .2em .7em; padding: .2em 0; }
+  .ct .oc-cs { align-self: center; }
+  .ct-nm { font-weight: 700; font-size: 1.1em; }
+  .ct-day.today .ct-nm { font-size: 1.3em; }
+  .ct-t { font-weight: 800; font-variant-numeric: tabular-nums; }
+  .ct-note { color: var(--muted); }
+  .ho { display: grid; grid-template-columns: 1.8em auto minmax(0, 1fr) auto; align-items: center; gap: .2em .6em; padding: .3em 0; border-bottom: 1px solid var(--line); }
+  .ho-i { color: var(--muted); font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+  .ho-n { font-weight: 700; font-size: 1.1em; min-width: 0; }
+  .ho.first .ho-n { font-size: 1.35em; font-weight: 800; }
+  .ho.first .ho-i { color: var(--gold); font-size: 1.2em; }
+  .ho-m { display: flex; flex-direction: column; align-items: flex-end; color: var(--muted); font-size: .9em; text-align: right; }
+  .ho-m b { color: var(--ink); }
+  .ho-ph { font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; }
+  .ho.off { opacity: .55; }
+  .ho-more { color: var(--muted); padding: .3em 0 0 2.4em; font-size: .9em; }
+  .ho-sec + .ho-sec { margin-top: .5em; }
 </style>
 </head>
 <body class="t-blues">
@@ -444,7 +466,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-20i';
+  var PAGE_VERSION = '2026-10-21a';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -742,9 +764,9 @@ var LOCK = (function () {
 
   function tileHtml(t, bi, ti) {
     var titles = { onduty: "Who's working", staffing: 'Staffing', off: 'Off today', cruisers: 'Cruisers', training: 'Upcoming training',
-      overlaps: 'Overlaps to review', message: 'Notice', clock: '', feed: 'Latest changes', ready: 'Training readiness', oncall: 'On call' };
+      overlaps: 'Overlaps to review', message: 'Notice', clock: '', feed: 'Latest changes', ready: 'Training readiness', oncall: 'On call', court: 'Court', holdover: 'Holdover list' };
     var title = t.title || titles[t.type] || '';
-    var sub = t.squad && /^(onduty|staffing|off)$/.test(t.type) ? t.squad : '';
+    var sub = t.squad && /^(onduty|staffing|off|holdover)$/.test(t.type) ? t.squad : '';
     var inner = '', o = t.o || {};
     if (t.type === 'onduty') {
       var cols = list(o, 'cols', ['cs', 'rank', 'hr', 'cr', 'pat', 'duty', 'brk', 'labels', 'tags', 'dot']);
@@ -849,6 +871,33 @@ var LOCK = (function () {
         }).join('') : '<p class="empty oc-none">No one listed</p>';
         var isToday = i === 0 && !t.skipToday;
         return '<div class="oc-day' + (isToday ? ' today' : '') + (odays.length === 1 && isToday ? ' only' : '') + '">' + head + ppl + '</div>';
+      }).join('');
+    } else if (t.type === 'court') {
+      var cdays = t.days || [];
+      inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' : !cdays.length ? '<p class="empty">No one is scheduled for court.</p>' : cdays.map(function (d) {
+        // Officers on one case are listed together under its docket.
+        var order = [], by = {};
+        d.rows.forEach(function (r) { var k = r.docket || ''; if (!by[k]) { by[k] = []; order.push(k); } by[k].push(r); });
+        return '<div class="ct-day' + (d.date === t.today ? ' today' : '') + '"><div class="day">' + esc(dayLabel(d.date)) + ' <span class="ct-n">' + d.rows.length + '</span></div>' +
+          order.map(function (k) {
+            var g = by[k], ada = String(g.map(function (r) { return r.ada; }).filter(Boolean)[0] || '').replace(/^\s*a\.?\s*d\.?\s*a\.?\s*[:\-]?\s*/i, ''), cc = g.map(function (r) { return r.cc; }).filter(Boolean)[0] || '';
+            var head = [k ? '<span><b>Docket</b> ' + esc(k) + '</span>' : '', ada ? '<span><b>ADA</b> ' + esc(ada) + '</span>' : '', cc ? '<span><b>Case</b> ' + esc(cc) + '</span>' : ''].join('');
+            return '<div class="ct-grp">' + (head ? '<div class="ct-h">' + head + '</div>' : '') + g.map(function (r) {
+              return '<div class="ct">' + (r.cs ? '<span class="oc-cs">' + esc(r.cs) + '</span>' : '') + '<span class="ct-nm">' + esc(r.n) + '</span>' +
+                (r.time ? '<span class="ct-t">' + esc(r.time) + '</span>' : '') + (r.note ? '<span class="ct-note">' + esc(r.note) + '</span>' : '') + '</div>';
+            }).join('') + '</div>';
+          }).join('') + '</div>';
+      }).join('');
+    } else if (t.type === 'holdover') {
+      var hsecs = t.sections || [];
+      inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' : hsecs.map(function (sec) {
+        return '<div class="ho-sec' + (sec.key === t.now ? ' now' : '') + '">' + (hsecs.length > 1 || sec.key !== t.now ? '<div class="day">' + esc(SHIFT_NAMES[sec.key] || sec.title) + (sec.key === t.now ? ' · now' : '') + '</div>' : '') +
+          (sec.rows.length ? sec.rows.map(function (r, i) {
+            return '<div class="ho' + (r.off ? ' off' : '') + (i === 0 && !r.off ? ' first' : '') + '"><span class="ho-i">' + (i + 1) + '</span>' + (r.cs ? '<span class="oc-cs">' + esc(r.cs) + '</span>' : '') +
+              '<span class="ho-n">' + esc(r.n) + (r.off ? ' <span class="pill lv">Off today</span>' : '') + '</span>' +
+              '<span class="ho-m">' + (r.dlh ? '<span>' + (r.dlh === 'Never held' ? esc(r.dlh) : 'Held <b>' + esc(r.dlh) + '</b>') + (r.ago ? ' · ' + esc(r.ago) : '') + '</span>' : '') +
+              (r.ph ? '<span class="ho-ph">' + esc(r.ph) + '</span>' : '') + '</span></div>';
+          }).join('') + (sec.more ? '<div class="ho-more">+ ' + sec.more + ' more on the list</div>' : '') : '<p class="empty">No one listed</p>') + '</div>';
       }).join('');
     } else if (t.type === 'clock') {
       var n = new Date();
