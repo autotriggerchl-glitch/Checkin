@@ -335,6 +335,18 @@
     .rl { display: inline-grid; place-items: center; float: left; margin: .2em .6em 0 0; width: 2.2em; height: 2.2em; border-radius: 50%;
       border: 1px solid rgba(255,255,255,.35); background: transparent; color: inherit; font-size: 1.1em; cursor: pointer; }
   }
+  /* On call */
+  .oc { display: flex; align-items: baseline; flex-wrap: wrap; gap: .2em .7em; padding: .3em 0; border-bottom: 1px solid var(--line); }
+  .oc-n { font-weight: 700; font-size: 1.15em; }
+  .oc-cs { align-self: center; background: var(--blue); color: #fff; border-radius: .3em; padding: .05em .45em; font-weight: 800; font-size: .95em; }
+  .t-blues .oc-cs { background: #14284B; } .t-blues.dark .oc-cs { background: #2B4677; }
+  .oc-day.today .oc-cs { font-size: 1.15em; } .oc-day.only .oc-cs { font-size: 1.5em; }
+  .oc-day.today .oc-n { font-size: 1.6em; font-weight: 800; }
+  .oc-day.only .oc-n { font-size: 2.4em; }
+  .oc-c { background: var(--lv-bg); color: var(--ink); border-radius: .35em; padding: 0 .45em; font-weight: 600; font-size: .95em; }
+  .oc-t { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .oc-day + .oc-day { margin-top: .4em; }
+  .oc-none { padding: .3em 0; }
 </style>
 </head>
 <body class="t-blues">
@@ -418,7 +430,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-17h';
+  var PAGE_VERSION = '2026-10-20b';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -704,7 +716,7 @@ var LOCK = (function () {
 
   function tileHtml(t, bi, ti) {
     var titles = { onduty: "Who's working", staffing: 'Staffing', off: 'Off today', cruisers: 'Cruisers', training: 'Upcoming training',
-      overlaps: 'Overlaps to review', message: 'Notice', clock: '', feed: 'Latest changes', ready: 'Training readiness' };
+      overlaps: 'Overlaps to review', message: 'Notice', clock: '', feed: 'Latest changes', ready: 'Training readiness', oncall: 'On call' };
     var title = t.title || titles[t.type] || '';
     var sub = t.squad && /^(onduty|staffing|off)$/.test(t.type) ? t.squad : '';
     var inner = '', o = t.o || {};
@@ -799,6 +811,18 @@ var LOCK = (function () {
             (rs.indexOf('bar') >= 0 ? '<div class="bar ' + (pct < 70 ? 'low' : pct < 90 ? 'mid' : '') + '"><i style="width:' + pct + '%"></i></div>' : '') +
             (rest ? '<div class="sub">' + esc(rest) + '</div>' : '') + names + '</div>';
         }).join('');
+    } else if (t.type === 'oncall') {
+      var osw = list(o, 'show', ['cover', 'times']);
+      var odays = t.days || [];
+      inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' : odays.map(function (d, i) {
+        var head = odays.length > 1 || d.head ? '<div class="day">' + esc(d.head || dayLabel(d.date)) + '</div>' : '';
+        var ppl = d.people.length ? d.people.map(function (p) {
+          return '<div class="oc' + (i === 0 && p.now ? ' now' : '') + '">' + (p.cs ? '<span class="oc-cs">' + esc(p.cs) + '</span>' : '') + '<span class="oc-n">' + esc(p.n) + '</span>' +
+            (p.cover && osw.indexOf('cover') >= 0 ? '<span class="oc-c">covering for ' + esc(p.cover) + '</span>' : '') +
+            (p.time && osw.indexOf('times') >= 0 ? '<span class="oc-t">' + esc(p.time) + '</span>' : '') + '</div>';
+        }).join('') : '<p class="empty oc-none">No one listed</p>';
+        return '<div class="oc-day' + (i === 0 ? ' today' : '') + (odays.length === 1 ? ' only' : '') + '">' + head + ppl + '</div>';
+      }).join('');
     } else if (t.type === 'clock') {
       var n = new Date();
       var cl = list(o, 'show', ['date', 'wx']);
