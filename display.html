@@ -20,7 +20,9 @@
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
-  body { font: 400 clamp(13px, 1.05vw, 34px)/1.3 "Segoe UI", Roboto, Arial, sans-serif; cursor: none; }
+  body { font: 400 clamp(13px, 1.05vw, 34px)/1.3 "Segoe UI", Roboto, Arial, sans-serif; }
+  /* The mouse hides after 3 seconds without moving (so it doesn't sit on a TV), and comes back when it moves. */
+  body.idle, body.idle * { cursor: none !important; }
   .screen { position: fixed; inset: 0; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; }
   /* Header */
   .hd { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1.2em; padding: .6em 1.2em; background: var(--panel); border-bottom: .2em solid var(--gold); }
@@ -90,6 +92,9 @@
   .pill.ot { background: var(--err); color: #2A0503; }
   .pill.lv { background: var(--warn); color: #2A1C00; }
   .pill.tag { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); font-weight: 700; }
+  /* Not in yet: coming in later today */
+  .pill.up { background: transparent; color: var(--muted); border: 1px dashed var(--muted); font-weight: 700; }
+  .pr.up .nm, .pr.up .hr, .pr.up .cr { opacity: .75; }
   .pr .hr { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
   .pr .hr .lv { display: block; color: var(--warn); font-size: .8em; }
   .pr .cr { font-weight: 700; text-align: center; }
@@ -435,7 +440,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-20e';
+  var PAGE_VERSION = '2026-10-20h';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -554,7 +559,7 @@ var LOCK = (function () {
         '<div class="right"><button type="button" class="rl" id="rl" aria-label="Reload">↻</button><div class="clock" id="clk">' + hm(now) + '</div><div class="date">' + esc(longDate(now)) + '</div>' +
           '<div class="wx" id="wx">' + wxText() + '</div></div></div>' +
       '<div id="wxa">' + wxAlertHtml() + '</div>' +
-      (b.banner ? bannerHtml(b.banner) : '<div></div>') +
+      (b.banner ? bannerHtml(b.banner, list({ s: b.bshow }, 's', ['pat', 'sup', 'staff', 'off', 'cars', 'ov'])) : '<div></div>') +
       '<div class="body l-' + layout + '">' + b.tiles.map(function (t, ti) { return tileHtml(t, bi, ti); }).join('') + '</div>' +
       (b.ticker && msgs.length ? '<div class="tick"><span id="tick">' + msgs.map(esc).join('   •   ') + '</span></div>' : '<div></div>') +
       '</div>';
@@ -584,18 +589,21 @@ var LOCK = (function () {
   }
 
   // "Right now" numbers across the top.
-  function bannerHtml(n) {
+  function bannerHtml(n, show) {
+    show = show || ['pat', 'sup', 'staff', 'off', 'cars', 'ov'];
+    var on = function (k) { return show.indexOf(k) >= 0; };
+    if (!show.length) return '<div></div>';
     var shift = SHIFT_NAMES[n.shift] || '';
     var low = n.pat < n.min;
     var staffBad = /not\s*met|below|short|under|need|hire/i.test(n.staffing || '');
     var box = function (cls, k, v, s) { return '<div class="bx ' + cls + '"><div class="k">' + esc(k) + '</div><div class="v">' + v + '</div><div class="s">' + esc(s || ' ') + '</div></div>'; };
     return '<div class="ban">' +
-      box(low ? 'bad' : 'good', 'Patrol on now', n.pat + '<small>of ' + n.min + ' min</small>', shift + (n.squad ? ' · ' + n.squad : '')) +
-      box('', 'Supervisors on', n.sup, shift) +
-      box(staffBad ? 'bad' : n.staffing ? 'good' : '', 'Staffing', staffBad ? 'Short' : n.staffing ? 'Met' : '–', shortStaff(n.staffing) || 'No staffing line yet') +
-      box(n.off ? 'mid' : '', 'Out today', n.off, 'Sick, vacation and other leave') +
-      box(n.carsOut ? 'bad' : 'good', 'Cruisers down', n.carsOut, n.carsOut ? 'Out of service' : 'All in service') +
-      (n.overlaps == null ? '' : box(n.overlaps ? 'bad' : 'good', 'Overlaps', n.overlaps, n.overlaps ? 'Waiting for review' : 'None waiting')) +
+      (on('pat') ? box(low ? 'bad' : 'good', 'Patrol on now', n.pat + '<small>of ' + n.min + ' min</small>', shift + (n.squad ? ' · ' + n.squad : '')) : '') +
+      (on('sup') ? box('', 'Supervisors on', n.sup, shift) : '') +
+      (on('staff') ? box(staffBad ? 'bad' : n.staffing ? 'good' : '', 'Staffing', staffBad ? 'Short' : n.staffing ? 'Met' : '–', shortStaff(n.staffing) || 'No staffing line yet') : '') +
+      (on('off') ? box(n.off ? 'mid' : '', 'Out today', n.off, 'Sick, vacation and other leave') : '') +
+      (on('cars') ? box(n.carsOut ? 'bad' : 'good', 'Cruisers down', n.carsOut, n.carsOut ? 'Out of service' : 'All in service') : '') +
+      (n.overlaps == null || !on('ov') ? '' : box(n.overlaps ? 'bad' : 'good', 'Overlaps', n.overlaps, n.overlaps ? 'Waiting for review' : 'None waiting')) +
       '</div>';
   }
 
@@ -695,8 +703,9 @@ var LOCK = (function () {
     var tags = (s.pill && cols.indexOf('labels') >= 0 ? '<span class="pill ' + s.pillCls + '">' + esc(s.pill) + '</span>' : '') +
       (cols.indexOf('tags') >= 0 ? (x.ct ? '<span class="pill tag">' + esc(x.ct) + '</span>' : '') +
         (x.tmp ? '<span class="pill tag">Temporary</span>' : '') +
-        (x.drp ? '<span class="pill tag">Dropped in DTS</span>' : '') : '');
-    return '<div class="pr ' + esc(x.t) + ' ' + s.cls + (x.on ? ' on' : '') + (cls || '') + '">' +
+        (x.drp ? '<span class="pill tag">Dropped in DTS</span>' : '') : '') +
+      (x.up && !x.on && !x.a && cols.indexOf('dot') >= 0 ? '<span class="pill up">Coming in ' + esc(String(x.h || '').slice(0, 4)) + '</span>' : '');
+    return '<div class="pr ' + esc(x.t) + ' ' + s.cls + (x.on ? ' on' : '') + (x.up && !x.on ? ' up' : '') + (cls || '') + '">' +
       '<span class="cs">' + esc(x.cs || '·') + '</span>' +
       '<span class="who"><span class="nm">' + esc(x.n) + '</span>' + (x.r ? '<span class="rk">' + esc(x.r) + '</span>' : '') + tags + '</span>' +
       '<span class="hr">' + hours + '</span>' +
@@ -927,6 +936,15 @@ var LOCK = (function () {
       kids[i % kids.length].hidden = true; kids[(i + 1) % kids.length].hidden = false;
     });
   }, 12000);
+  // Hide the mouse after 3 seconds without moving; any move shows it again.
+  var idleT = 0;
+  var wake = function () {
+    document.body.classList.remove('idle');
+    clearTimeout(idleT);
+    idleT = setTimeout(function () { document.body.classList.add('idle'); }, 3000);
+  };
+  ['mousemove', 'mousedown', 'keydown', 'touchstart'].forEach(function (ev) { window.addEventListener(ev, wake, { passive: true }); });
+  wake();
   var turned = portrait();
   window.addEventListener('resize', function () { if (portrait() !== turned) { turned = portrait(); if (st.data) render(); } });
 
