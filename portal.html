@@ -70,6 +70,13 @@
   .pick.on { border-color: var(--navy); } .pick.on .n { background: var(--navy); border-color: var(--navy); color: #fff; }
   @media (prefers-color-scheme: dark) { .pick.on { border-color: #6FA2F5; } .pick.on .n { background: #2B4677; border-color: #6FA2F5; } }
   .pick small { display: block; color: var(--muted); font-size: 14px; }
+  .chc { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 8px 0 0; border: 1.5px solid var(--line); border-radius: 10px; background: var(--card); }
+  .chc.on { border-color: var(--navy); }
+  .chc .t { flex: 1; min-width: 0; font-weight: 700; } .chc .t small { display: block; color: var(--muted); font-size: 14px; font-weight: 400; }
+  .chc select { flex: none; width: 140px; min-height: 44px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--field); color: var(--ink); font: inherit; font-size: 15px; font-weight: 700; }
+  .chc.on select { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .sum { margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--field); font-size: 15px; }
+  @media (prefers-color-scheme: dark) { .chc.on { border-color: #6FA2F5; } .chc.on select { background: #2B4677; border-color: #6FA2F5; } }
   a.cls { display: block; text-decoration: none; color: inherit; background: var(--card); border-radius: 10px; padding: 14px 16px; margin: 0 0 12px; box-shadow: 0 1px 0 rgba(20, 40, 75, .12); }
   a.cls.mine { border-left: 5px solid var(--ok); }
   .ct { display: flex; align-items: flex-start; gap: 10px; }
@@ -187,7 +194,7 @@
   function bidCard(b) {
     var mine = b.mine;
     var status = mine
-      ? '<div class="st in"><b>✓ Your bid is in</b> (' + esc(when(mine.at)) + ')' + (mine.choices.length ? '<br>' + mine.choices.map(function (id, i) { return esc((mine.choices.length > 1 ? (i + 1) + '. ' : '') + opLabel(b, id)); }).join('<br>') : '') + '</div>'
+      ? '<div class="st in"><b>✓ Your bid is in</b> (' + esc(when(mine.at)) + ')' + (mine.choices.length ? '<br>' + mine.choices.map(function (id, i) { return esc((mine.choices.length > 1 ? ordinal(i + 1) + ' choice: ' : '') + opLabel(b, id)); }).join('<br>') : '') + '</div>'
       : '<div class="st none">' + (b.closed ? 'You didn\'t bid.' : 'You haven\'t bid on this.') + '</div>';
     return '<div class="bid' + (b.closed ? ' closed' : '') + '"><div class="hd"><b>' + esc(b.title) + '</b><small>' +
         esc(b.closed ? b.closed : 'Bids close ' + when(b.closes) + ' · ' + left(b.closes)) + '</small></div>' +
@@ -211,6 +218,7 @@
       '<p class="when">' + esc(lines.length ? lines.join(' · ') : [range, c.location].filter(Boolean).join(' · ')) + (c.deadline && !c.closed ? '<br>Sign up by ' + esc(md(c.deadline)) : '') + '</p></a>';
   }
 
+  function ordinal(n) { var s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
   // ---------- Bid: pick the openings (first choice first) ----------
   function openBid(id) {
     var b = st.data.bids.filter(function (x) { return x.id === id; })[0]; if (!b) return;
@@ -218,19 +226,32 @@
     var ov = $('ov');
     var draw = function (busy) {
       ov.innerHTML = '<div class="card"><h1>' + esc(b.title) + '</h1>' +
-        '<p class="note">' + (b.openings.length > 1 ? 'Tap the openings you want, <b>first choice first</b>. Tap again to take one off.' : 'This bid has one opening.') + '</p>' +
-        b.openings.map(function (o) {
-          var n = order.indexOf(o.id);
-          return '<button type="button" class="pick' + (n >= 0 ? ' on' : '') + '" data-o="' + esc(o.id) + '"><span class="n">' + (n >= 0 ? n + 1 : '') + '</span><span>' + esc(o.label) + (o.note ? '<small>' + esc(o.note) + '</small>' : '') + '</span></button>';
-        }).join('') +
+        (b.openings.length > 1
+          ? '<p class="note">For each opening you want, pick your <b>1st choice</b>, <b>2nd choice</b>, <b>3rd choice</b> and so on. Leave the ones you don\'t want on "Don\'t want".</p>' +
+            b.openings.map(function (o) {
+              var n = order.indexOf(o.id);
+              return '<div class="chc' + (n >= 0 ? ' on' : '') + '"><span class="t">' + esc(o.label) + (o.note ? '<small>' + esc(o.note) + '</small>' : '') + '</span>' +
+                '<select data-rk="' + esc(o.id) + '" aria-label="Your choice for ' + esc(o.label) + '"><option value="0">Don\'t want</option>' +
+                b.openings.map(function (_, k) { return '<option value="' + (k + 1) + '"' + (n === k ? ' selected' : '') + '>' + ordinal(k + 1) + ' choice</option>'; }).join('') + '</select></div>';
+            }).join('') +
+            (order.length ? '<div class="sum"><b>Your order:</b><br>' + order.map(function (oid, i) { return esc(ordinal(i + 1) + ': ' + opLabel(b, oid)); }).join('<br>') + '</div>' : '')
+          : '<p class="note">This bid has one opening.</p>' + b.openings.map(function (o) {
+              return '<button type="button" class="pick on" data-o="' + esc(o.id) + '"><span class="n">1</span><span>' + esc(o.label) + (o.note ? '<small>' + esc(o.note) + '</small>' : '') + '</span></button>';
+            }).join('')) +
         '<p class="note" style="margin-top:12px">Bids close ' + esc(when(b.closes)) + '. You can change or withdraw your bid until then. You\'ll get an email to confirm.</p>' +
         '<div class="btns"><button type="button" class="btn ghost" id="bx">Cancel</button><button type="button" class="btn" id="bgo"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Sending…' : b.mine ? 'Update my bid' : 'Put in my bid') + '</button></div></div>';
-      ov.querySelectorAll('[data-o]').forEach(function (el) {
-        el.onclick = function () { var oid = el.getAttribute('data-o'), i = order.indexOf(oid); if (i >= 0) order.splice(i, 1); else order.push(oid); draw(); };
+      // Picking "2nd choice" puts it 2nd; the others move down one.
+      ov.querySelectorAll('[data-rk]').forEach(function (el) {
+        el.onchange = function () {
+          var oid = el.getAttribute('data-rk'), k = +el.value, i = order.indexOf(oid);
+          if (i >= 0) order.splice(i, 1);
+          if (k > 0) order.splice(Math.min(k - 1, order.length), 0, oid);
+          draw();
+        };
       });
       $('bx').onclick = function () { ov.hidden = true; };
       $('bgo').onclick = function () {
-        if (!order.length) { toast('Tap the opening you want.', true); return; }
+        if (!order.length) { toast('Pick your 1st choice.', true); return; }
         draw(true);
         api('portalBid', { email: st.email, token: st.token, b: b.id, act: 'bid', choices: order }).then(function (res) {
           if (res && res.pin) { ov.hidden = true; signOut(); return; }
