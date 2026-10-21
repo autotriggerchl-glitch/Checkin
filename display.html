@@ -435,7 +435,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-20c';
+  var PAGE_VERSION = '2026-10-20d';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -822,11 +822,12 @@ var LOCK = (function () {
       inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' : odays.map(function (d, i) {
         var head = odays.length > 1 || d.head ? '<div class="day">' + esc(d.head || dayLabel(d.date)) + '</div>' : '';
         var ppl = d.people.length ? d.people.map(function (p) {
-          return '<div class="oc' + (i === 0 && p.now ? ' now' : '') + (p.cover && osw.indexOf('cover') >= 0 ? ' cov' : '') + '">' + (p.cs ? '<span class="oc-cs">' + esc(p.cs) + '</span>' : '') + '<span class="oc-n">' + esc(p.n) + '</span>' +
+          return '<div class="oc' + (i === 0 && o.start !== 'next' && p.now ? ' now' : '') + (p.cover && osw.indexOf('cover') >= 0 ? ' cov' : '') + '">' + (p.cs ? '<span class="oc-cs">' + esc(p.cs) + '</span>' : '') + '<span class="oc-n">' + esc(p.n) + '</span>' +
             (p.cover && osw.indexOf('cover') >= 0 ? '<span class="oc-c"><b>Covering for</b>' + (p.coverCs ? '<span class="oc-ccs">' + esc(p.coverCs) + '</span>' : '') + esc(p.cover) + '</span>' : '') +
             (p.time && osw.indexOf('times') >= 0 ? '<span class="oc-t">' + esc(p.time) + '</span>' : '') + '</div>';
         }).join('') : '<p class="empty oc-none">No one listed</p>';
-        return '<div class="oc-day' + (i === 0 ? ' today' : '') + (odays.length === 1 ? ' only' : '') + '">' + head + ppl + '</div>';
+        var isToday = i === 0 && o.start !== 'next';
+        return '<div class="oc-day' + (isToday ? ' today' : '') + (odays.length === 1 && isToday ? ' only' : '') + '">' + head + ppl + '</div>';
       }).join('');
     } else if (t.type === 'clock') {
       var n = new Date();
