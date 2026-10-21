@@ -36,6 +36,9 @@
   /* Weather warning bar */
   .wxa { background: #7A1712; color: #fff; padding: .45em 1.2em; font-weight: 700; display: flex; gap: .8em; align-items: baseline; }
   .wxa.minor { background: #6B4A06; }
+  .sst { background: #B3261E; color: #fff; padding: .45em 1.2em; font-weight: 700; display: flex; gap: .8em; align-items: baseline; font-size: 1.15em; }
+  .sst b { text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+  .sst span { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .wxa b { text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
   .wxa span { opacity: .92; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Right now banner */
@@ -48,6 +51,7 @@
   .bx.good { border-left-color: var(--ok); } .bx.good .v { color: var(--ok); }
   .bx.bad { border-left-color: var(--err); } .bx.bad .v { color: var(--err); }
   .bx.mid { border-left-color: var(--warn); } .bx.mid .v { color: var(--warn); }
+  .bx.det { border-left-color: #9C7A22; } .bx.det .v { color: #9C7A22; }
   /* Body grid */
   .body { position: relative; padding: .8em; display: grid; gap: .8em; min-height: 0; }
   .l-one { grid-template: minmax(0, 1fr) / 1fr; }
@@ -268,7 +272,7 @@
   .t-blues .hd .date, .t-blues .hd .wx { color: #C9D4E8; }
   .t-blues .wxa.minor { background: #FFF3D1; color: #5A3E00; border-bottom: 1px solid #E6C66B; }
   .t-blues .bx { border: 0; border-top: .35em solid var(--line); border-left: 0; border-radius: .2em; box-shadow: 0 1px 0 #CDD6E3; }
-  .t-blues .bx.good { border-top-color: var(--ok); } .t-blues .bx.bad { border-top-color: var(--err); } .t-blues .bx.mid { border-top-color: var(--warn); }
+  .t-blues .bx.good { border-top-color: var(--ok); } .t-blues .bx.bad { border-top-color: var(--err); } .t-blues .bx.mid { border-top-color: var(--warn); } .t-blues .bx.det { border-top-color: #9C7A22; }
   .t-blues .bx .k { text-transform: none; letter-spacing: 0; font-size: .95em; color: var(--muted); }
   .t-blues .bx .v { font-family: "Zilla Slab", Georgia, serif; }
   .t-blues .tile { border: 0; border-radius: .2em; box-shadow: 0 1px 0 #CDD6E3; }
@@ -440,7 +444,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-20h';
+  var PAGE_VERSION = '2026-10-20i';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -558,8 +562,8 @@ var LOCK = (function () {
         '<div style="min-width:0"><div class="dept">' + esc(DEPT) + '</div><div class="bname">' + esc(b.name) + '</div></div>' +
         '<div class="right"><button type="button" class="rl" id="rl" aria-label="Reload">↻</button><div class="clock" id="clk">' + hm(now) + '</div><div class="date">' + esc(longDate(now)) + '</div>' +
           '<div class="wx" id="wx">' + wxText() + '</div></div></div>' +
-      '<div id="wxa">' + wxAlertHtml() + '</div>' +
-      (b.banner ? bannerHtml(b.banner, list({ s: b.bshow }, 's', ['pat', 'sup', 'staff', 'off', 'cars', 'ov'])) : '<div></div>') +
+      '<div>' + shortHtml(b.short) + '<div id="wxa">' + wxAlertHtml() + '</div></div>' +
+      (b.banner ? bannerHtml(b.banner, list({ s: b.bshow }, 's', ['pat', 'sup', 'staff', 'off', 'cars', 'det', 'ov'])) : '<div></div>') +
       '<div class="body l-' + layout + '">' + b.tiles.map(function (t, ti) { return tileHtml(t, bi, ti); }).join('') + '</div>' +
       (b.ticker && msgs.length ? '<div class="tick"><span id="tick">' + msgs.map(esc).join('   •   ') + '</span></div>' : '<div></div>') +
       '</div>';
@@ -588,9 +592,16 @@ var LOCK = (function () {
     return 'Short ' + m[1] + ' · ' + ('0' + m[2]).slice(-2) + m[3] + '–' + ('0' + m[4]).slice(-2) + m[5] + (gaps.length > 1 ? ' (+' + (gaps.length - 1) + ' more)' : '');
   }
 
+  // Short-staffed warning across the top (a board option): the shift working now.
+  function shortHtml(x) {
+    if (!x || !x.text) return '';
+    var t = shortStaff(x.text);
+    return '<div class="sst"><b>Short-staffed' + (x.shift ? ' · ' + esc(x.shift) : '') + '</b><span>' + esc(t || x.text) + '</span></div>';
+  }
+
   // "Right now" numbers across the top.
   function bannerHtml(n, show) {
-    show = show || ['pat', 'sup', 'staff', 'off', 'cars', 'ov'];
+    show = show || ['pat', 'sup', 'staff', 'off', 'cars', 'det', 'ov'];
     var on = function (k) { return show.indexOf(k) >= 0; };
     if (!show.length) return '<div></div>';
     var shift = SHIFT_NAMES[n.shift] || '';
@@ -603,6 +614,7 @@ var LOCK = (function () {
       (on('staff') ? box(staffBad ? 'bad' : n.staffing ? 'good' : '', 'Staffing', staffBad ? 'Short' : n.staffing ? 'Met' : '–', shortStaff(n.staffing) || 'No staffing line yet') : '') +
       (on('off') ? box(n.off ? 'mid' : '', 'Out today', n.off, 'Sick, vacation and other leave') : '') +
       (on('cars') ? box(n.carsOut ? 'bad' : 'good', 'Cruisers down', n.carsOut, n.carsOut ? 'Out of service' : 'All in service') : '') +
+      (on('det') && n.det ? box(n.det.length ? 'det' : '', 'On a detail', n.det.length, n.det.length ? 'Cruiser ' + n.det.join(', ') : 'None now') : '') +
       (n.overlaps == null || !on('ov') ? '' : box(n.overlaps ? 'bad' : 'good', 'Overlaps', n.overlaps, n.overlaps ? 'Waiting for review' : 'None waiting')) +
       '</div>';
   }
