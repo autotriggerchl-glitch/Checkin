@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CPD Portal">
+<meta name="theme-color" content="#14284B">
+<title>Officer Portal</title>
+<script src="config.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&family=Zilla+Slab:wght@600;700&display=swap">
+<style>
+  :root { --navy: #14284B; --navy2: #1E3A68; --gold: #B8923A; --ink: #14213A; --muted: #5B677B; --line: #D6DDE8; --bg: #EEF2F7; --card: #fff;
+    --ok: #1C7A4A; --okbg: #E4F3EA; --err: #B3261E; --errbg: #FBEAE9; --wait: #7A5200; --waitbg: #FFF4D6; --focus: #2F6FD6; --field: #F3F6FA; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink: #E8EDF5; --muted: #98A6BC; --line: #2A3A58; --bg: #0D1626; --card: #17223A; --ok: #5CC28C; --okbg: rgba(92,194,140,.14); --err: #F2837A; --errbg: rgba(242,131,122,.14);
+      --wait: #E2B45C; --waitbg: rgba(226,180,92,.14); --focus: #6FA2F5; --field: #1F2C45; }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.4 "Source Sans 3", -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  button, input { font: inherit; color: inherit; }
+  .top { background: var(--navy); color: #fff; border-bottom: 4px solid var(--gold); padding: calc(12px + env(safe-area-inset-top)) 16px 12px; }
+  .top-in { max-width: 600px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+  .top img { width: 44px; height: 44px; object-fit: contain; flex: none; }
+  .top small { display: block; font-size: 12.5px; color: #C9D4E8; letter-spacing: .03em; }
+  .top b { display: block; font: 700 23px/1.1 "Zilla Slab", Georgia, serif; }
+  main { max-width: 600px; margin: 0 auto; padding: 16px 16px calc(60px + env(safe-area-inset-bottom)); }
+  .card { background: var(--card); border-radius: 10px; padding: 16px; margin: 0 0 14px; box-shadow: 0 1px 0 rgba(20, 40, 75, .12); }
+  h1 { margin: 0 0 6px; font: 700 23px/1.2 "Zilla Slab", Georgia, serif; }
+  h2 { margin: 22px 2px 10px; font: 700 19px/1.2 "Zilla Slab", Georgia, serif; display: flex; align-items: center; gap: 8px; }
+  h2 em { font: 700 13px "Source Sans 3", sans-serif; padding: 1px 8px; border-radius: 999px; background: var(--line); color: var(--ink); }
+  .note { color: var(--muted); font-size: 15.5px; margin: 0; }
+  .err { color: var(--err); font-weight: 600; font-size: 15px; min-height: 1.3em; margin: 10px 0 0; }
+  .link { border: 0; background: none; color: var(--focus); font-weight: 700; padding: 8px 2px; cursor: pointer; font-size: 15px; }
+  .btn { min-height: 50px; padding: 0 18px; border: 0; border-radius: 10px; background: var(--navy); color: #fff; font-size: 17px; font-weight: 700; cursor: pointer; width: 100%; }
+  @media (prefers-color-scheme: dark) { .btn { background: #2B4677; } }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+  .btn.danger { background: transparent; color: var(--err); border: 1.5px solid var(--err); }
+  .btn:disabled { opacity: .55; }
+  .field { display: block; margin: 12px 0 0; }
+  .field span { display: block; font-size: 14px; font-weight: 700; margin: 0 0 4px; }
+  input[type=email], input[type=text], input[type=password] {
+    width: 100%; min-height: 50px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--field); font-size: 17px; color: var(--ink); }
+  input:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px rgba(47, 111, 214, .2); }
+  input.pin { letter-spacing: 8px; font-weight: 700; font-size: 20px; }
+  .row2 { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  .me { display: flex; align-items: center; gap: 12px; }
+  .me .av { flex: none; width: 46px; height: 46px; border-radius: 50%; background: var(--navy); color: #fff; display: grid; place-items: center; font-weight: 800; border: 2px solid var(--gold); }
+  .me div { flex: 1; min-width: 0; }
+  .me b { display: block; font-size: 18px; }
+  .me small { color: var(--muted); font-size: 14px; }
+  .bid { background: var(--card); border-radius: 10px; margin: 0 0 12px; overflow: hidden; box-shadow: 0 1px 0 rgba(20, 40, 75, .12); border-left: 5px solid var(--gold); }
+  .bid.closed { border-left-color: var(--line); }
+  .bid .hd { padding: 12px 14px 0; }
+  .bid .hd b { display: block; font: 700 19px/1.25 "Zilla Slab", Georgia, serif; }
+  .bid .hd small { color: var(--muted); font-size: 14.5px; }
+  .bid .ops { margin: 8px 14px 0; padding: 0; list-style: none; }
+  .bid .ops li { padding: 6px 0; border-top: 1px solid var(--line); font-weight: 700; }
+  .bid .ops li:first-child { border-top: 0; }
+  .bid .ops li small { display: block; font-weight: 400; color: var(--muted); font-size: 14px; }
+  .bid .det { margin: 8px 14px 0; color: var(--muted); font-size: 15px; white-space: pre-wrap; }
+  .bid .st { margin: 12px 14px 0; padding: 10px 12px; border-radius: 8px; font-size: 15.5px; }
+  .st.in { background: var(--okbg); color: var(--ok); } .st.in b { color: inherit; }
+  .st.none { background: var(--field); color: var(--muted); }
+  .bid .acts { display: grid; gap: 8px; padding: 12px 14px 14px; }
+  .pick { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 54px; padding: 8px 12px; margin: 8px 0 0; border: 1.5px solid var(--line); border-radius: 10px; background: var(--card); text-align: left; cursor: pointer; }
+  .pick .n { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; font-weight: 800; }
+  .pick.on { border-color: var(--navy); } .pick.on .n { background: var(--navy); border-color: var(--navy); color: #fff; }
+  @media (prefers-color-scheme: dark) { .pick.on { border-color: #6FA2F5; } .pick.on .n { background: #2B4677; border-color: #6FA2F5; } }
+  .pick small { display: block; color: var(--muted); font-size: 14px; }
+  a.cls { display: block; text-decoration: none; color: inherit; background: var(--card); border-radius: 10px; padding: 14px 16px; margin: 0 0 12px; box-shadow: 0 1px 0 rgba(20, 40, 75, .12); }
+  a.cls.mine { border-left: 5px solid var(--ok); }
+  .ct { display: flex; align-items: flex-start; gap: 10px; }
+  .ct b { flex: 1; font-size: 18px; line-height: 1.25; }
+  .ct .chev { color: var(--muted); font-size: 22px; line-height: 1; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
+  .tag { padding: 2px 8px; border-radius: 6px; background: var(--field); font-size: 13px; font-weight: 700; }
+  .tag.ok { background: var(--okbg); color: var(--ok); } .tag.wait { background: var(--waitbg); color: var(--wait); } .tag.closed { background: var(--errbg); color: var(--err); }
+  .when { margin: 8px 0 0; font-size: 15px; color: var(--muted); }
+  .empty { text-align: center; color: var(--muted); padding: 14px 8px; font-size: 15.5px; }
+  .foot { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .ov { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; justify-content: center; background: rgba(13, 22, 38, .55); padding: 12px; }
+  .ov[hidden] { display: none; }
+  @media (min-height: 600px) { .ov { align-items: center; } }
+  .ov .card { width: 100%; max-width: 480px; margin: 0; max-height: 90vh; overflow: auto; }
+  .btns { display: flex; gap: 10px; margin-top: 14px; }
+  .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 40;
+    max-width: calc(100% - 32px); padding: 12px 16px; border-radius: 10px; background: #14213A; color: #fff; font-size: 15px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
+  .toast.bad { background: #B3261E; }
+  .toast[hidden] { display: none; }
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <img id="patch" alt="" hidden>
+  <div><small id="dept">Chelsea Police Department</small><b>Officer Portal</b></div>
+</div></header>
+<main id="app"><p class="empty">Loading…</p></main>
+<div class="ov" id="ov" role="dialog" aria-modal="true" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+// Officer portal: sign in with your department email and PIN, then see
+// what's open to you: shift bids (put in, change or withdraw your own bid
+// until it closes; nobody else's bids are shown) and training classes.
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var app = $('app');
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { if (v === '' || v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+  };
+  function api(name, arg) {
+    return fetch(APP_URL, { method: 'POST', body: JSON.stringify({ pub: name, arg: arg || {} }) })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+  }
+  // The same pass the class sign-up page uses, so classes open already signed in.
+  function passes() { try { return JSON.parse(store.get('ci-pass') || '{}') || {}; } catch (e) { return {}; } }
+  function savePass(me, token) { var all = passes(), k = me.name + '|' + me.call; if (token) all[k] = token; else delete all[k]; store.set('ci-pass', JSON.stringify(all)); }
+  var st = { email: store.get('portal-email') || '', me: null, token: store.get('portal-token') || '', data: null, step: 'login', err: '', busy: false };
+  try { st.me = JSON.parse(store.get('portal-me') || 'null'); } catch (e) {}
+
+  var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  function md(s) { var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? DOW[new Date(+m[1], +m[2] - 1, +m[3]).getDay()] + ' ' + (+m[2]) + '/' + (+m[3]) : s; }
+  function when(t) { var d = new Date(t); return DOW[d.getDay()] + ' ' + (d.getMonth() + 1) + '/' + d.getDate() + ' at ' + ('0' + d.getHours()).slice(-2) + ('0' + d.getMinutes()).slice(-2); }
+  function left(t) { var m = Math.round((t - Date.now()) / 60000); if (m <= 0) return 'Closed'; if (m < 60) return m + ' min left'; var h = Math.round(m / 60); return h < 48 ? h + ' hours left' : Math.round(h / 24) + ' days left'; }
+  function initials(n) { var w = String(n || '').replace(/^(Lt|Sgt|Capt|Chief|Det|Ofc)\.?\s+/i, '').split(/\s+/).filter(Boolean); return ((w[0] || '?')[0] + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase(); }
+  var toastT = null;
+  function toast(m, bad) { var t = $('toast'); t.textContent = m; t.className = 'toast' + (bad ? ' bad' : ''); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, bad ? 6000 : 3500); }
+  function signedIn(res) {
+    st.me = res.me; st.token = res.token || st.token;
+    store.set('portal-email', st.email); store.set('portal-token', st.token); store.set('portal-me', JSON.stringify(st.me));
+    savePass(st.me, st.token);
+    store.set('ci-class-me', JSON.stringify(st.me));
+    st.step = 'home'; st.err = ''; render(); loadHome();
+  }
+  function signOut() {
+    if (st.me) savePass(st.me, '');
+    store.set('portal-token', ''); store.set('portal-me', ''); store.set('portal-home', '');
+    st.token = ''; st.me = null; st.data = null; st.step = 'login'; st.err = ''; render();
+  }
+
+  // ---------- Start ----------
+  if (st.token && st.email) { st.step = 'home'; try { st.data = JSON.parse(store.get('portal-home') || 'null'); } catch (e) {} render(); loadHome(); }
+  else render();
+
+  function loadHome(quiet) {
+    api('portalHome', { email: st.email, token: st.token }).then(function (res) {
+      if (res && res.ok) {
+        st.data = res; store.set('portal-home', JSON.stringify(res));
+        if (res.patch) { var img = $('patch'); img.src = res.patch; img.hidden = false; img.onerror = function () { img.hidden = true; }; }
+        render(); return;
+      }
+      if (res && res.pin) { st.token = ''; store.set('portal-token', ''); st.step = 'login'; st.err = 'Sign in again with your PIN.'; render(); return; }
+      if (!quiet) toast((res && res.message) || 'That didn\'t load.', true);
+    }, function () { if (!quiet) toast('Couldn\'t reach the portal. Check your signal.', true); });
+  }
+
+  function render() {
+    if (st.step === 'login') return renderLogin();
+    if (st.step === 'setup') return renderSetup();
+    if (!st.data) { app.innerHTML = '<p class="empty">Loading…</p>'; return; }
+    var d = st.data, me = d.me;
+    var open = d.bids.filter(function (b) { return !b.closed; }), done = d.bids.filter(function (b) { return b.closed; });
+    var mine = d.classes.filter(function (c) { return c.seats.length || c.waits.length; });
+    var other = d.classes.filter(function (c) { return !c.seats.length && !c.waits.length; });
+    app.innerHTML =
+      '<div class="card"><div class="me"><span class="av">' + esc(initials(me.name)) + '</span><div><b>' + esc(me.name) + '</b><small>' + esc([me.call, d.email].filter(Boolean).join(' · ')) + '</small></div></div>' +
+        '<div class="row2"><button type="button" class="link" id="chpin">Change PIN</button><button type="button" class="link" id="out">Sign out</button></div></div>' +
+      '<h2>Shift bids <em>' + open.length + '</em></h2>' +
+      (open.length ? open.map(bidCard).join('') : '<p class="empty">No shift bids are open right now.</p>') +
+      (done.length ? done.map(bidCard).join('') : '') +
+      '<h2>My classes <em>' + mine.length + '</em></h2>' +
+      (mine.length ? mine.map(classCard).join('') : '<p class="empty">You aren\'t signed up for any classes.</p>') +
+      (other.length ? '<h2>Open for sign-up <em>' + other.length + '</em></h2>' + other.map(classCard).join('') : '') +
+      '<div class="foot"><span>Your bids are private: only you and the administrators see them.</span><button type="button" class="link" id="refresh">Refresh</button></div>';
+    $('chpin').onclick = openChangePin;
+    $('out').onclick = signOut;
+    $('refresh').onclick = function () { loadHome(); toast('Up to date.'); };
+    app.querySelectorAll('[data-bid]').forEach(function (b) { b.onclick = function () { openBid(b.getAttribute('data-bid')); }; });
+    app.querySelectorAll('[data-wd]').forEach(function (b) { b.onclick = function () { withdraw(b.getAttribute('data-wd')); }; });
+  }
+  function opLabel(b, id) { var o = b.openings.filter(function (x) { return x.id === id; })[0]; return o ? o.label : id; }
+  function bidCard(b) {
+    var mine = b.mine;
+    var status = mine
+      ? '<div class="st in"><b>✓ Your bid is in</b> (' + esc(when(mine.at)) + ')' + (mine.choices.length ? '<br>' + mine.choices.map(function (id, i) { return esc((mine.choices.length > 1 ? (i + 1) + '. ' : '') + opLabel(b, id)); }).join('<br>') : '') + '</div>'
+      : '<div class="st none">' + (b.closed ? 'You didn\'t bid.' : 'You haven\'t bid on this.') + '</div>';
+    return '<div class="bid' + (b.closed ? ' closed' : '') + '"><div class="hd"><b>' + esc(b.title) + '</b><small>' +
+        esc(b.closed ? b.closed : 'Bids close ' + when(b.closes) + ' · ' + left(b.closes)) + '</small></div>' +
+      '<ul class="ops">' + b.openings.map(function (o) { return '<li>' + esc(o.label) + (o.note ? '<small>' + esc(o.note) + '</small>' : '') + '</li>'; }).join('') + '</ul>' +
+      (b.details ? '<p class="det">' + esc(b.details) + '</p>' : '') + status +
+      (b.closed ? '<div style="height:14px"></div>' : '<div class="acts"><button type="button" class="btn" data-bid="' + esc(b.id) + '">' + (mine ? 'Change my bid' : 'Put in a bid') + '</button>' +
+        (mine ? '<button type="button" class="btn danger" data-wd="' + esc(b.id) + '">Withdraw my bid</button>' : '') + '</div>') + '</div>';
+  }
+  function classCard(c) {
+    var url = 'class.html?c=' + encodeURIComponent(c.c) + '&k=' + encodeURIComponent(c.k);
+    var range = c.first ? (c.first === c.last ? md(c.first) : md(c.first) + ' – ' + md(c.last)) : '';
+    var tags = [];
+    if (c.category) tags.push('<span class="tag">' + esc(c.category) + '</span>');
+    if (c.seats.length) tags.push('<span class="tag ok">✓ Signed up</span>');
+    if (c.waits.length) tags.push('<span class="tag wait">Waitlist</span>');
+    if (c.closed) tags.push('<span class="tag closed">Closed</span>');
+    else if (!c.seats.length && !c.waits.length) tags.push('<span class="tag' + (c.seatsLeft ? ' ok' : ' closed') + '">' + (c.seatsLeft ? c.seatsLeft + (c.seatsLeft === 1 ? ' seat' : ' seats') + ' left' : 'Full: waitlist') + '</span>');
+    var lines = c.seats.map(function (s) { return md(s.date) + (s.start ? ' ' + s.start + (s.end ? '-' + s.end : '') : ''); });
+    return '<a class="cls' + (c.seats.length ? ' mine' : '') + '" href="' + esc(url) + '"><div class="ct"><b>' + esc(c.title) + '</b><span class="chev" aria-hidden="true">›</span></div>' +
+      '<div class="tags">' + tags.join('') + '</div>' +
+      '<p class="when">' + esc(lines.length ? lines.join(' · ') : [range, c.location].filter(Boolean).join(' · ')) + (c.deadline && !c.closed ? '<br>Sign up by ' + esc(md(c.deadline)) : '') + '</p></a>';
+  }
+
+  // ---------- Bid: pick the openings (first choice first) ----------
+  function openBid(id) {
+    var b = st.data.bids.filter(function (x) { return x.id === id; })[0]; if (!b) return;
+    var order = b.mine ? b.mine.choices.slice() : (b.openings.length === 1 ? [b.openings[0].id] : []);
+    var ov = $('ov');
+    var draw = function (busy) {
+      ov.innerHTML = '<div class="card"><h1>' + esc(b.title) + '</h1>' +
+        '<p class="note">' + (b.openings.length > 1 ? 'Tap the openings you want, <b>first choice first</b>. Tap again to take one off.' : 'This bid has one opening.') + '</p>' +
+        b.openings.map(function (o) {
+          var n = order.indexOf(o.id);
+          return '<button type="button" class="pick' + (n >= 0 ? ' on' : '') + '" data-o="' + esc(o.id) + '"><span class="n">' + (n >= 0 ? n + 1 : '') + '</span><span>' + esc(o.label) + (o.note ? '<small>' + esc(o.note) + '</small>' : '') + '</span></button>';
+        }).join('') +
+        '<p class="note" style="margin-top:12px">Bids close ' + esc(when(b.closes)) + '. You can change or withdraw your bid until then. You\'ll get an email to confirm.</p>' +
+        '<div class="btns"><button type="button" class="btn ghost" id="bx">Cancel</button><button type="button" class="btn" id="bgo"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Sending…' : b.mine ? 'Update my bid' : 'Put in my bid') + '</button></div></div>';
+      ov.querySelectorAll('[data-o]').forEach(function (el) {
+        el.onclick = function () { var oid = el.getAttribute('data-o'), i = order.indexOf(oid); if (i >= 0) order.splice(i, 1); else order.push(oid); draw(); };
+      });
+      $('bx').onclick = function () { ov.hidden = true; };
+      $('bgo').onclick = function () {
+        if (!order.length) { toast('Tap the opening you want.', true); return; }
+        draw(true);
+        api('portalBid', { email: st.email, token: st.token, b: b.id, act: 'bid', choices: order }).then(function (res) {
+          if (res && res.pin) { ov.hidden = true; signOut(); return; }
+          if (res && res.bid) replaceBid(res.bid);
+          ov.hidden = true; render(); toast((res && res.message) || 'That didn\'t go through.', !(res && res.ok));
+        }, function () { draw(); toast('Couldn\'t send your bid. Check your signal and try again.', true); });
+      };
+    };
+    ov.onclick = function (e) { if (e.target === ov) ov.hidden = true; };
+    draw(); ov.hidden = false;
+  }
+  function replaceBid(nb) { st.data.bids = st.data.bids.map(function (x) { return x.id === nb.id ? nb : x; }); store.set('portal-home', JSON.stringify(st.data)); }
+  function withdraw(id) {
+    var b = st.data.bids.filter(function (x) { return x.id === id; })[0]; if (!b) return;
+    var ov = $('ov');
+    ov.innerHTML = '<div class="card"><h1>Withdraw your bid?</h1><p class="note">You can bid again any time before ' + esc(when(b.closes)) + '.</p>' +
+      '<div class="btns"><button type="button" class="btn ghost" id="wx">Keep my bid</button><button type="button" class="btn danger" id="wgo">Withdraw</button></div></div>';
+    ov.hidden = false;
+    $('wx').onclick = function () { ov.hidden = true; };
+    $('wgo').onclick = function () {
+      this.disabled = true; this.textContent = 'Withdrawing…';
+      api('portalBid', { email: st.email, token: st.token, b: id, act: 'withdraw' }).then(function (res) {
+        if (res && res.pin) { ov.hidden = true; signOut(); return; }
+        if (res && res.bid) replaceBid(res.bid);
+        ov.hidden = true; render(); toast((res && res.message) || 'That didn\'t go through.', !(res && res.ok));
+      }, function () { ov.hidden = true; toast('Couldn\'t reach the portal. Try again.', true); });
+    };
+  }
+
+  // ---------- Sign in ----------
+  function renderLogin() {
+    app.innerHTML = '<div class="card"><h1>Sign in</h1><p class="note">Use your department email and your 4-number PIN (the same PIN as class sign-ups). This phone will remember you.</p>' +
+      '<label class="field"><span>Email</span><input type="email" id="em" autocomplete="email" autocapitalize="off" spellcheck="false" value="' + esc(st.email) + '" placeholder="you@chelseama.gov"></label>' +
+      '<label class="field"><span>PIN</span><input type="password" class="pin" id="p1" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password"></label>' +
+      '<p class="err" id="err">' + esc(st.err) + '</p>' +
+      '<div class="btns"><button type="button" class="btn" id="go"' + (st.busy ? ' disabled' : '') + '>' + (st.busy ? 'Checking…' : 'Sign in') + '</button></div>' +
+      '<div class="row2"><button type="button" class="link" id="first">First time? Set up your PIN</button><button type="button" class="link" id="forgot">Forgot PIN?</button></div></div>';
+    $('p1').oninput = function () { this.value = this.value.replace(/\D/g, '').slice(0, 4); };
+    app.onkeydown = function (e) { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); login(); } };
+    $('go').onclick = login;
+    $('first').onclick = function () { st.email = $('em').value.trim().toLowerCase(); if (!okEmail()) return; st.step = 'setup'; st.sent = false; st.err = ''; render(); };
+    $('forgot').onclick = function () {
+      st.email = $('em').value.trim().toLowerCase(); if (!okEmail()) return;
+      api('portalForgot', { email: st.email }).then(function (res) { st.err = ''; render(); toast((res && res.message) || 'That didn\'t work.', !(res && res.ok)); },
+        function () { toast('Couldn\'t reach the portal.', true); });
+    };
+    setTimeout(function () { var f = st.email ? $('p1') : $('em'); if (f) f.focus(); }, 50);
+  }
+  function okEmail() { if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(st.email)) { $('err').textContent = 'Enter your email address.'; return false; } return true; }
+  function login() {
+    if (st.busy) return;
+    st.email = $('em').value.trim().toLowerCase();
+    if (!okEmail()) return;
+    var pin = $('p1').value.trim();
+    if (!/^\d{4}$/.test(pin)) { $('err').textContent = 'Your PIN is 4 numbers.'; return; }
+    st.busy = true; render();
+    api('portalLogin', { email: st.email, pin: pin }).then(function (res) {
+      st.busy = false;
+      if (res && res.ok) { signedIn(res); return; }
+      if (res && res.pin === 'new') { st.step = 'setup'; st.sent = false; st.err = ''; render(); return; }
+      st.err = (res && res.message) || 'That didn\'t work.'; render();
+    }, function () { st.busy = false; st.err = 'Couldn\'t reach the portal. Check your signal.'; render(); });
+  }
+
+  // First time: a code by email, then make up a PIN.
+  function renderSetup() {
+    app.innerHTML = '<div class="card"><h1>Set up your PIN</h1>' +
+      (st.sent ? '<p class="note">We emailed a 6-digit code to <b>' + esc(st.email) + '</b>. Enter it, then make up a 4-number PIN.</p>' +
+          '<label class="field"><span>Code from the email</span><input type="text" id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label>' +
+          '<label class="field"><span>Make up a PIN (4 numbers)</span><input type="password" class="pin" id="n1" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label>' +
+          '<label class="field"><span>Type the PIN again</span><input type="password" class="pin" id="n2" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label>'
+        : '<p class="note">We\'ll email a 6-digit code to <b>' + esc(st.email) + '</b> to make sure it\'s you. It has to be the email on file in the Employee Directory.</p>') +
+      '<p class="err" id="err">' + esc(st.err) + '</p>' +
+      '<div class="btns"><button type="button" class="btn ghost" id="back">Back</button><button type="button" class="btn" id="go"' + (st.busy ? ' disabled' : '') + '>' +
+        (st.busy ? 'One moment…' : st.sent ? 'Set up and sign in' : 'Email me a code') + '</button></div>' +
+      (st.sent ? '<div class="row2"><button type="button" class="link" id="resend">Send a new code</button></div>' : '') + '</div>';
+    app.querySelectorAll('input[inputmode=numeric]').forEach(function (el) { el.oninput = function () { el.value = el.value.replace(/\D/g, '').slice(0, el.maxLength); }; });
+    $('back').onclick = function () { st.step = 'login'; st.err = ''; render(); };
+    var send = function () {
+      st.busy = true; render();
+      api('portalSetup', { email: st.email }).then(function (res) {
+        st.busy = false;
+        if (res && res.ok) { st.sent = true; st.err = ''; render(); toast(res.message); return; }
+        st.err = (res && res.message) || 'That didn\'t work.'; render();
+      }, function () { st.busy = false; st.err = 'Couldn\'t reach the portal.'; render(); });
+    };
+    if ($('resend')) $('resend').onclick = function () { st.sent = false; send(); };
+    $('go').onclick = function () {
+      if (!st.sent) { send(); return; }
+      var code = $('code').value.trim(), p1 = $('n1').value.trim(), p2 = $('n2').value.trim();
+      if (!/^\d{6}$/.test(code)) { $('err').textContent = 'The code is 6 numbers.'; return; }
+      if (!/^\d{4}$/.test(p1)) { $('err').textContent = 'Your PIN should be 4 numbers.'; return; }
+      if (p1 !== p2) { $('err').textContent = 'The two PINs don\'t match.'; return; }
+      st.busy = true; render();
+      api('portalSetup', { email: st.email, code: code, pin: p1 }).then(function (res) {
+        st.busy = false;
+        if (res && res.ok) { signedIn(res); toast('Your PIN is set up.'); return; }
+        if (res && res.expired) st.sent = false;
+        st.err = (res && res.message) || 'That didn\'t work.'; render();
+      }, function () { st.busy = false; st.err = 'Couldn\'t reach the portal.'; render(); });
+    };
+  }
+
+  function openChangePin() {
+    var ov = $('ov');
+    ov.innerHTML = '<div class="card"><h1>Change your PIN</h1><p class="note">One PIN for the portal and class sign-ups. Other phones will need the new PIN.</p>' +
+      '<label class="field"><span>Current PIN</span><input type="password" class="pin" id="c0" inputmode="numeric" maxlength="4"></label>' +
+      '<label class="field"><span>New PIN (4 numbers)</span><input type="password" class="pin" id="c1" inputmode="numeric" maxlength="4"></label>' +
+      '<label class="field"><span>New PIN again</span><input type="password" class="pin" id="c2" inputmode="numeric" maxlength="4"></label>' +
+      '<p class="err" id="cerr"></p><div class="btns"><button type="button" class="btn ghost" id="cx">Cancel</button><button type="button" class="btn" id="cs">Save</button></div></div>';
+    ov.hidden = false;
+    ov.querySelectorAll('input').forEach(function (el) { el.oninput = function () { el.value = el.value.replace(/\D/g, '').slice(0, 4); $('cerr').textContent = ''; }; });
+    $('cx').onclick = function () { ov.hidden = true; };
+    $('cs').onclick = function () {
+      var a = $('c0').value, b = $('c1').value, c = $('c2').value;
+      if (!/^\d{4}$/.test(a) || !/^\d{4}$/.test(b)) { $('cerr').textContent = 'PINs are 4 numbers.'; return; }
+      if (b !== c) { $('cerr').textContent = 'The new PINs don\'t match.'; return; }
+      this.disabled = true;
+      api('portalPin', { email: st.email, token: st.token, pin: a, newPin: b }).then(function (res) {
+        if (res && res.ok) { ov.hidden = true; toast('Your PIN is changed.'); return; }
+        $('cs').disabled = false; $('cerr').textContent = (res && res.message) || 'That didn\'t save.';
+      }, function () { $('cs').disabled = false; $('cerr').textContent = 'Couldn\'t reach the portal.'; });
+    };
+  }
+  // Coming back to the page: refresh quietly.
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && st.step === 'home') loadHome(true); });
+})();
+</script>
+</body>
+</html>
