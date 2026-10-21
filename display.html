@@ -343,7 +343,12 @@
   .oc-day.today .oc-cs { font-size: 1.15em; } .oc-day.only .oc-cs { font-size: 1.5em; }
   .oc-day.today .oc-n { font-size: 1.6em; font-weight: 800; }
   .oc-day.only .oc-n { font-size: 2.4em; }
-  .oc-c { background: var(--lv-bg); color: var(--ink); border-radius: .35em; padding: 0 .45em; font-weight: 600; font-size: .95em; }
+  /* "Covering for": stands out in amber, with the call sign of who they cover */
+  .oc-c { display: inline-flex; align-items: center; gap: .4em; background: #F2B544; color: #2A1C00; border-radius: .4em; padding: .12em .55em; font-weight: 700; font-size: 1em; }
+  .oc-c b { font-weight: 800; text-transform: uppercase; letter-spacing: .04em; font-size: .78em; }
+  .oc-ccs { background: #2A1C00; color: #F6D27A; border-radius: .25em; padding: 0 .35em; font-weight: 800; font-size: .9em; }
+  .oc.cov { border-left: .3em solid #F2B544; padding-left: .5em; }
+  .oc-day.today .oc-c { font-size: 1.15em; } .oc-day.only .oc-c { font-size: 1.35em; }
   .oc-t { color: var(--muted); font-variant-numeric: tabular-nums; }
   .oc-day + .oc-day { margin-top: .4em; }
   .oc-none { padding: .3em 0; }
@@ -430,7 +435,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-20b';
+  var PAGE_VERSION = '2026-10-20c';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -817,8 +822,8 @@ var LOCK = (function () {
       inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' : odays.map(function (d, i) {
         var head = odays.length > 1 || d.head ? '<div class="day">' + esc(d.head || dayLabel(d.date)) + '</div>' : '';
         var ppl = d.people.length ? d.people.map(function (p) {
-          return '<div class="oc' + (i === 0 && p.now ? ' now' : '') + '">' + (p.cs ? '<span class="oc-cs">' + esc(p.cs) + '</span>' : '') + '<span class="oc-n">' + esc(p.n) + '</span>' +
-            (p.cover && osw.indexOf('cover') >= 0 ? '<span class="oc-c">covering for ' + esc(p.cover) + '</span>' : '') +
+          return '<div class="oc' + (i === 0 && p.now ? ' now' : '') + (p.cover && osw.indexOf('cover') >= 0 ? ' cov' : '') + '">' + (p.cs ? '<span class="oc-cs">' + esc(p.cs) + '</span>' : '') + '<span class="oc-n">' + esc(p.n) + '</span>' +
+            (p.cover && osw.indexOf('cover') >= 0 ? '<span class="oc-c"><b>Covering for</b>' + (p.coverCs ? '<span class="oc-ccs">' + esc(p.coverCs) + '</span>' : '') + esc(p.cover) + '</span>' : '') +
             (p.time && osw.indexOf('times') >= 0 ? '<span class="oc-t">' + esc(p.time) + '</span>' : '') + '</div>';
         }).join('') : '<p class="empty oc-none">No one listed</p>';
         return '<div class="oc-day' + (i === 0 ? ' today' : '') + (odays.length === 1 ? ' only' : '') + '">' + head + ppl + '</div>';
