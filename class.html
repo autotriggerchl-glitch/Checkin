@@ -94,6 +94,16 @@
   .state.ok { color: var(--ok); }
   .state.wait { color: var(--wait); }
   .drop-link { border: 0; background: none; color: var(--err); font-weight: 600; font-size: 15px; padding: 10px 2px; cursor: pointer; }
+  .rpbox { margin: 4px 16px 0; padding: 10px 12px 2px; border-radius: 12px; background: #F3F6FB; border: 1px dashed #B9C6DA; }
+  .rpbox.me { background: #EAF4EE; border: 1.5px solid var(--ok); }
+  .rphead { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; color: var(--navy); }
+  .rphead span { letter-spacing: 0; text-transform: none; font-size: 13px; padding: 2px 9px; border-radius: 999px; background: #E2E8F2; color: var(--navy); }
+  .rphead span.full { background: var(--errbg); color: var(--err); }
+  .rpbox .who { padding: 4px 0 4px; }
+  .rpbox .who .cs { background: #4F6A97; }
+  .rpbox .acts { padding: 4px 0 10px; }
+  .rpbox .btn { min-height: 46px; font-size: 16px; }
+  .donote { flex: 1 1 100%; font-size: 14px; color: var(--muted); }
   .foot { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; margin-top: 4px; }
 
   .topic { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 18px 2px 10px; font-size: 19px; color: var(--navy); }
@@ -204,7 +214,7 @@ function start() {
   // In-Service: list the dates by topic (default) or all by date. Remembered on this phone.
   var sortBy = store.get('ci-class-sort') === 'date' ? 'date' : 'topic';
 
-  var st = { cls: DATA.cls, today: DATA.today, me: null, matches: [], busy: '', confirm: '', confirmTimer: null };
+  var st = { cls: DATA.cls, today: DATA.today, done: DATA.done || [], me: null, matches: [], busy: '', confirm: '', confirmTimer: null };
 
   function peopleOf(list) {
     return (list || []).map(function (p) {
@@ -218,7 +228,7 @@ function start() {
   // replaces it a moment later.
   window.ciFresh = function (d) {
     if (!d || !d.ok || st.sending || st.queue.length) return;
-    st.cls = d.cls; st.today = d.today || st.today;
+    st.cls = d.cls; st.today = d.today || st.today; if (d.done) st.done = d.done;
     PEOPLE = peopleOf(st.cls.people);
     if (!(document.activeElement && document.activeElement.id === 'q') && !($('pinov') && !$('pinov').hidden) && !($('swov') && !$('swov').hidden)) render();
   };
@@ -258,6 +268,15 @@ function start() {
     return String(x.n || '').toLowerCase().replace(/[^a-z]/g, '') === String(me.name || '').toLowerCase().replace(/[^a-z]/g, '');
   }
   function isMe(x) { return samePerson(x, st.me); }
+  // Role players. hasRp: this class takes them. doneMe: this officer already
+  // took the training (still current), so they can role-play but not attend.
+  function hasRp() { return !!st.cls.rp; }
+  function doneMe() {
+    if (!st.me || !hasRp() || isIS()) return false;
+    var c = String(st.me.call || '').toUpperCase(), n = String(st.me.name || '').toLowerCase().replace(/[^a-z]/g, '');
+    return (c && st.done.indexOf('c:' + c) >= 0) || (!!n && st.done.indexOf('n:' + n) >= 0);
+  }
+  function rpOf(d) { return { seat: (d.rp || []).some(isMe), wait: (d.rpWait || []).map(isMe).indexOf(true) }; }
 
   function closedReason() {
     var c = st.cls;
@@ -316,6 +335,7 @@ function start() {
         (c.location ? '<p class="meta">' + esc(c.location) + '</p>' : '') +
         (c.category ? '<span class="cat">' + esc(c.category) + '</span>' : '') +
         (c.notes ? '<p class="notes">' + esc(c.notes) + '</p>' : '') +
+        (hasRp() ? '<p class="meta"><b>Role players wanted.</b> Anyone can sign up as a role player, even if you\'ve already taken this training.</p>' : '') +
         (isIS() ? '<p class="meta">Pick one date for each topic: ' + esc(groups.join(', ')) + '. You can come back and finish later.</p>' : '') +
         (c.deadline && !closed ? '<p class="meta"><b>Sign up by ' + esc(day(c.deadline)) + '.</b></p>' : '') +
       '</div>';
@@ -329,6 +349,8 @@ function start() {
         ? '<div class="banner ' + (left.length < groups.length ? 'mine' : 'none') + '">You have ' + (groups.length - left.length) + ' of ' + groups.length +
             ' topics. Still need: ' + esc(left.join(', ')) + '.</div>'
         : '<div class="banner mine">You have all ' + groups.length + ' topics. You\'re done!</div>';
+    } else if (st.me && doneMe()) {
+      html += '<div class="banner none">You\'ve already completed this training, so you can\'t sign up to attend. You can sign up as a <b>role player</b> on any date below.</div>';
     } else if (st.me) {
       if (mine.seat) {
         html += '<div class="banner mine">You\'re signed up for ' + esc(shortDay(mine.seat.date) + (times(mine.seat) ? ' ' + times(mine.seat) : '')) + '.' +
@@ -341,6 +363,10 @@ function start() {
       }
     }
 
+    if (st.me && hasRp()) {
+      var rpMine = c.dates.filter(function (d) { return rpOf(d).seat && d.date >= st.today; });
+      if (rpMine.length) html += '<div class="banner mine">You\'re a role player on ' + esc(rpMine.map(function (d) { return shortDay(d.date) + (times(d) ? ' ' + times(d) : ''); }).join(', ')) + '.</div>';
+    }
     html += '<h2 style="margin:18px 2px 10px"><i>2</i> &nbsp;' + (st.me && !closed ? (isIS() ? 'Pick a date for each topic' : 'Pick a date') : 'Dates') + '</h2>';
     // Days this officer already has, by topic (for "you're in X that day").
     var busyDays = {};
@@ -427,7 +453,13 @@ function start() {
     }
 
     // Buttons, for the person picked, while sign-ups are open.
-    if (st.me && !closed && !past) {
+    var rpNow = hasRp() && st.me ? rpOf(d) : { seat: false, wait: -1 };
+    if (st.me && !closed && !past && doneMe() && !seatHere && !waitHere) {
+      if (!(rpNow.seat || rpNow.wait >= 0)) html += '<div class="acts"><span class="donote">You\'ve already taken this training.' + ((d.rpSeats || 0) > 0 ? ' Sign up as a role player below.' : '') + '</span></div>';
+      else html += '<div style="height:4px"></div>';
+    } else if (st.me && !closed && !past && (rpNow.seat || rpNow.wait >= 0) && !seatHere && !waitHere) {
+      html += '<div class="acts"><span class="donote">You\'re a role player this date, so you can\'t also attend it.</span></div>';
+    } else if (st.me && !closed && !past) {
       var busy = false;
       var b = '';
       var confirmKey = function (op) { return op + '|' + d.id; };
@@ -452,7 +484,40 @@ function start() {
     } else {
       html += '<div style="height:8px"></div>';
     }
+    if (hasRp() && (d.rpSeats || 0) > 0) html += rpBox(d, closed, past, seatHere, waitHere);
     return html + '</div>';
+  }
+
+  // The role-player part of a date card.
+  function rpBox(d, closed, past, seatHere, waitHere) {
+    var list = d.rp || [], wl = d.rpWait || [], n = d.rpSeats || 0, left = n - list.length, me = rpOf(d);
+    var h = '<div class="rpbox' + (me.seat ? ' me' : '') + '"><div class="rphead">Role players' +
+      '<span class="' + (left <= 0 ? 'full' : '') + '">' + list.length + ' of ' + n + (left <= 0 ? ' · Full' + (wl.length ? ', ' + wl.length + ' waiting' : '') : '') + '</span></div>' +
+      '<ul class="who">' + (list.length ? list.map(function (x) {
+        return '<li' + (isMe(x) ? ' class="you"' : '') + '><span class="cs">' + esc(x.c || '·') + '</span>' + esc(x.n) + (isMe(x) ? ' (you)' : '') + '</li>';
+      }).join('') : '<li class="open">No role players yet</li>') +
+      wl.map(function (x, i) { return '<li class="w' + (isMe(x) ? ' you' : '') + '"><span class="cs">W' + (i + 1) + '</span>' + esc(x.n) + (isMe(x) ? ' (you)' : '') + '</li>'; }).join('') + '</ul>';
+    if (st.me && !closed && !past) {
+      var b = '';
+      if (me.seat) {
+        b = '<span class="state ok">You\'re a role player for this date.</span>' +
+          (st.confirm === 'rpdrop|' + d.id
+            ? '<button type="button" class="btn warn" data-op="rpdrop" data-d="' + d.id + '">Tap again to drop out</button>'
+            : '<button type="button" class="drop-link" data-op="rpdrop" data-d="' + d.id + '">Drop out as a role player</button>');
+      } else if (me.wait >= 0) {
+        b = '<span class="state wait">You\'re #' + (me.wait + 1) + ' on the role-player waitlist.</span>' +
+          '<button type="button" class="drop-link" data-op="rpunwait" data-d="' + d.id + '">Leave the waitlist</button>';
+      } else if (seatHere) {
+        b = '';
+      } else if (left > 0) {
+        b = '<button type="button" class="btn ghost" data-op="rpjoin" data-d="' + d.id + '">Sign up as a role player</button>' +
+          (waitHere ? '<span class="note" style="flex:1 1 100%">You\'ll leave the attendee waitlist for this date.</span>' : '');
+      } else {
+        b = '<button type="button" class="btn ghost" data-op="rpwait" data-d="' + d.id + '">Join the role-player waitlist</button>';
+      }
+      if (b) h += '<div class="acts">' + b + '</div>';
+    }
+    return h + '</div><div style="height:12px"></div>';
   }
 
   // ---------- Who are you ----------
@@ -527,9 +592,10 @@ function start() {
     var mine = myStatus(isIS() ? dd.topic : '');
     // Switching away from a seat: a pop-up asks first.
     if (op === 'join' && mine.seat && mine.seat !== dd && !st.switchOk) { switchAsk(mine.seat, dd); return; }
+    if ((op === 'join' || op === 'wait') && doneMe()) { toast('You\'ve already completed this training. You can sign up as a role player instead.', true); return; }
     st.switchOk = false;
     // Dropping out takes a second tap.
-    var needs = op === 'drop';
+    var needs = op === 'drop' || op === 'rpdrop';
     if (needs && st.confirm !== op + '|' + dateId) {
       st.confirm = op + '|' + dateId;
       clearTimeout(st.confirmTimer);
@@ -605,6 +671,21 @@ function start() {
       if (d.wait.length && d['in'].length < d.seats) d['in'].push(d.wait.shift()); // first on the waitlist moves in
     } else if (op === 'unwait') {
       d.wait = d.wait.filter(function (y) { return !same(y); });
+    } else if (op === 'rpjoin' || op === 'rpwait') {
+      d.rp = (d.rp || []).filter(function (y) { return !same(y); });
+      d.rpWait = (d.rpWait || []).filter(function (y) { return !same(y); });
+      d.wait = d.wait.filter(function (y) { return !same(y); });
+      if (op === 'rpjoin') d.rp.push(meOf()); else d.rpWait.push(meOf());
+    } else if (op === 'rpdrop') {
+      d.rp = (d.rp || []).filter(function (y) { return !same(y); });
+      if ((d.rpWait || []).length && d.rp.length < (d.rpSeats || 0)) d.rp.push(d.rpWait.shift());
+    } else if (op === 'rpunwait') {
+      d.rpWait = (d.rpWait || []).filter(function (y) { return !same(y); });
+    }
+    // Attending a date: no longer a role player that day.
+    if (op === 'join' || op === 'wait') {
+      d.rp = (d.rp || []).filter(function (y) { return !same(y); });
+      d.rpWait = (d.rpWait || []).filter(function (y) { return !same(y); });
     }
     // In-Service: once they've given a PIN, the page knows they have one.
     if (st.pin && !hasPin()) (st.cls.pinSet = st.cls.pinSet || []).push(st.me.name + '|' + st.me.call);
@@ -616,6 +697,10 @@ function start() {
     return op === 'join' ? 'Signed up for ' + what + '.'
       : op === 'wait' ? 'On the waitlist for ' + what + '.'
       : op === 'drop' ? 'Dropped out of ' + what + '.'
+      : op === 'rpjoin' ? 'Signed up as a role player for ' + what + '.'
+      : op === 'rpwait' ? 'On the role-player waitlist for ' + what + '.'
+      : op === 'rpdrop' ? 'No longer a role player for ' + what + '.'
+      : op === 'rpunwait' ? 'Left the role-player waitlist for ' + what + '.'
       : 'Left the waitlist for ' + what + '.';
   }
 
@@ -813,7 +898,7 @@ function start() {
         refreshing = false;
         if (res && res.gone) { stop('Class sign-up', res.message); return; }
         if (!res || !res.ok || st.sending || st.queue.length) return;
-        st.cls = res.cls; st.today = res.today || st.today;
+        st.cls = res.cls; st.today = res.today || st.today; if (res.done) st.done = res.done;
         // Don't redraw under someone typing their name.
         if (document.activeElement && document.activeElement.id === 'q') return;
         render();
