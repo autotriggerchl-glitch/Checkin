@@ -84,7 +84,9 @@
   .ct .chev { color: var(--muted); font-size: 22px; line-height: 1; }
   .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
   .tag { padding: 2px 8px; border-radius: 6px; background: var(--field); font-size: 13px; font-weight: 700; }
-  .tag.ok { background: var(--okbg); color: var(--ok); } .tag.wait { background: var(--waitbg); color: var(--wait); } .tag.closed { background: var(--errbg); color: var(--err); }
+  .tag.ok { background: var(--okbg); color: var(--ok); }
+  .tag.rp { background: #E6EBF3; color: var(--navy); }
+  @media (prefers-color-scheme: dark) { .tag.rp { background: #22324F; color: #C9D6EE; } } .tag.wait { background: var(--waitbg); color: var(--wait); } .tag.closed { background: var(--errbg); color: var(--err); }
   .when { margin: 8px 0 0; font-size: 15px; color: var(--muted); }
   .empty { text-align: center; color: var(--muted); padding: 14px 8px; font-size: 15.5px; }
   .foot { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; margin-top: 8px; }
@@ -172,8 +174,9 @@
     if (!st.data) { app.innerHTML = '<p class="empty">Loading…</p>'; return; }
     var d = st.data, me = d.me;
     var open = d.bids.filter(function (b) { return !b.closed; }), done = d.bids.filter(function (b) { return b.closed; });
-    var mine = d.classes.filter(function (c) { return c.seats.length || c.waits.length; });
-    var other = d.classes.filter(function (c) { return !c.seats.length && !c.waits.length; });
+    var signed = function (c) { return c.seats.length || c.waits.length || (c.rpSeats || []).length || (c.rpWaits || []).length; };
+    var mine = d.classes.filter(signed);
+    var other = d.classes.filter(function (c) { return !signed(c); });
     app.innerHTML =
       '<div class="card"><div class="me"><span class="av">' + esc(initials(me.name)) + '</span><div><b>' + esc(me.name) + '</b><small>' + esc([me.call, d.email].filter(Boolean).join(' · ')) + '</small></div></div>' +
         '<div class="row2"><button type="button" class="link" id="chpin">Change PIN</button><button type="button" class="link" id="out">Sign out</button></div></div>' +
@@ -208,12 +211,20 @@
     var range = c.first ? (c.first === c.last ? md(c.first) : md(c.first) + ' – ' + md(c.last)) : '';
     var tags = [];
     if (c.category) tags.push('<span class="tag">' + esc(c.category) + '</span>');
+    var rpS = c.rpSeats || [], rpW = c.rpWaits || [];
     if (c.seats.length) tags.push('<span class="tag ok">✓ Signed up</span>');
     if (c.waits.length) tags.push('<span class="tag wait">Waitlist</span>');
+    if (rpS.length) tags.push('<span class="tag ok">✓ Role player</span>');
+    if (rpW.length) tags.push('<span class="tag wait">Role-player waitlist</span>');
     if (c.closed) tags.push('<span class="tag closed">Closed</span>');
-    else if (!c.seats.length && !c.waits.length) tags.push('<span class="tag' + (c.seatsLeft ? ' ok' : ' closed') + '">' + (c.seatsLeft ? c.seatsLeft + (c.seatsLeft === 1 ? ' seat' : ' seats') + ' left' : 'Full: waitlist') + '</span>');
-    var lines = c.seats.map(function (s) { return md(s.date) + (s.start ? ' ' + s.start + (s.end ? '-' + s.end : '') : ''); });
-    return '<a class="cls' + (c.seats.length ? ' mine' : '') + '" href="' + esc(url) + '"><div class="ct"><b>' + esc(c.title) + '</b><span class="chev" aria-hidden="true">›</span></div>' +
+    else if (!c.seats.length && !c.waits.length && !rpS.length && !rpW.length) {
+      if (!c.done) tags.push('<span class="tag' + (c.seatsLeft ? ' ok' : ' closed') + '">' + (c.seatsLeft ? c.seatsLeft + (c.seatsLeft === 1 ? ' seat' : ' seats') + ' left' : 'Full: waitlist') + '</span>');
+      if (c.rp) tags.push('<span class="tag rp">Role players wanted' + (c.rpLeft ? ': ' + c.rpLeft + ' left' : '') + '</span>');
+    }
+    if (c.done && !c.closed) tags.push('<span class="tag">You\'ve taken it: role player only</span>');
+    var hm = function (s) { return md(s.date) + (s.start ? ' ' + s.start + (s.end ? '-' + s.end : '') : ''); };
+    var lines = c.seats.map(hm).concat(rpS.map(function (s) { return hm(s) + ' (role player)'; }));
+    return '<a class="cls' + (c.seats.length || rpS.length ? ' mine' : '') + '" href="' + esc(url) + '"><div class="ct"><b>' + esc(c.title) + '</b><span class="chev" aria-hidden="true">›</span></div>' +
       '<div class="tags">' + tags.join('') + '</div>' +
       '<p class="when">' + esc(lines.length ? lines.join(' · ') : [range, c.location].filter(Boolean).join(' · ')) + (c.deadline && !c.closed ? '<br>Sign up by ' + esc(md(c.deadline)) : '') + '</p></a>';
   }
@@ -222,38 +233,48 @@
   // ---------- Bid: pick the openings (first choice first) ----------
   function openBid(id) {
     var b = st.data.bids.filter(function (x) { return x.id === id; })[0]; if (!b) return;
-    var order = b.mine ? b.mine.choices.slice() : (b.openings.length === 1 ? [b.openings[0].id] : []);
+    // order[k] = the opening ranked (k+1)th, or null while it's still to pick. Every opening gets a number.
+    var N = b.openings.length, ids = b.openings.map(function (o) { return o.id; });
+    var order = [];
+    for (var k0 = 0; k0 < N; k0++) order.push(null);
+    if (N === 1) order[0] = ids[0];
+    else if (b.mine) b.mine.choices.filter(function (c) { return ids.indexOf(c) >= 0; }).forEach(function (c, i) { order[i] = c; });
+    var left = 0;
     var ov = $('ov');
     var draw = function (busy) {
+      left = order.filter(function (x) { return !x; }).length;
       ov.innerHTML = '<div class="card"><h1>' + esc(b.title) + '</h1>' +
         (b.openings.length > 1
-          ? '<p class="note">For each opening you want, pick your <b>1st choice</b>, <b>2nd choice</b>, <b>3rd choice</b> and so on. Leave the ones you don\'t want on "Don\'t want".</p>' +
+          ? '<p class="note">Rank <b>every</b> opening: your <b>1st choice</b>, <b>2nd choice</b>, <b>3rd choice</b> and so on. Each number can be used once.</p>' +
             b.openings.map(function (o) {
               var n = order.indexOf(o.id);
               return '<div class="chc' + (n >= 0 ? ' on' : '') + '"><span class="t">' + esc(o.label) + (o.note ? '<small>' + esc(o.note) + '</small>' : '') + '</span>' +
-                '<select data-rk="' + esc(o.id) + '" aria-label="Your choice for ' + esc(o.label) + '"><option value="0">Don\'t want</option>' +
+                '<select data-rk="' + esc(o.id) + '" aria-label="Your choice for ' + esc(o.label) + '">' + (n < 0 ? '<option value="0" selected>Pick…</option>' : '') +
                 b.openings.map(function (_, k) { return '<option value="' + (k + 1) + '"' + (n === k ? ' selected' : '') + '>' + ordinal(k + 1) + ' choice</option>'; }).join('') + '</select></div>';
             }).join('') +
-            (order.length ? '<div class="sum"><b>Your order:</b><br>' + order.map(function (oid, i) { return esc(ordinal(i + 1) + ': ' + opLabel(b, oid)); }).join('<br>') + '</div>' : '')
+            (order.filter(Boolean).length ? '<div class="sum"><b>Your order:</b><br>' + order.map(function (oid, i) { return oid ? esc(ordinal(i + 1) + ': ' + opLabel(b, oid)) : '<span style="color:var(--err)">' + ordinal(i + 1) + ': not picked yet</span>'; }).join('<br>') +
+              (left ? '<br><span style="color:var(--err)">' + left + ' more to rank.</span>' : '') + '</div>' : '')
           : '<p class="note">This bid has one opening.</p>' + b.openings.map(function (o) {
               return '<button type="button" class="pick on" data-o="' + esc(o.id) + '"><span class="n">1</span><span>' + esc(o.label) + (o.note ? '<small>' + esc(o.note) + '</small>' : '') + '</span></button>';
             }).join('')) +
         '<p class="note" style="margin-top:12px">Bids close ' + esc(when(b.closes)) + '. You can change or withdraw your bid until then. You\'ll get an email to confirm.</p>' +
         '<div class="btns"><button type="button" class="btn ghost" id="bx">Cancel</button><button type="button" class="btn" id="bgo"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Sending…' : b.mine ? 'Update my bid' : 'Put in my bid') + '</button></div></div>';
-      // Picking "2nd choice" puts it 2nd; the others move down one.
+      // Picking "2nd choice": the opening that had 2nd swaps to this one's old number.
       ov.querySelectorAll('[data-rk]').forEach(function (el) {
         el.onchange = function () {
-          var oid = el.getAttribute('data-rk'), k = +el.value, i = order.indexOf(oid);
-          if (i >= 0) order.splice(i, 1);
-          if (k > 0) order.splice(Math.min(k - 1, order.length), 0, oid);
+          var oid = el.getAttribute('data-rk'), k = +el.value - 1, i = order.indexOf(oid);
+          if (k < 0) return;
+          var other = order[k];
+          order[k] = oid;
+          if (i >= 0 && i !== k) order[i] = other || null;
           draw();
         };
       });
       $('bx').onclick = function () { ov.hidden = true; };
       $('bgo').onclick = function () {
-        if (!order.length) { toast('Pick your 1st choice.', true); return; }
+        if (left) { toast('Give every opening a choice number first (' + left + ' more to rank).', true); return; }
         draw(true);
-        api('portalBid', { email: st.email, token: st.token, b: b.id, act: 'bid', choices: order }).then(function (res) {
+        api('portalBid', { email: st.email, token: st.token, b: b.id, act: 'bid', choices: order.filter(Boolean) }).then(function (res) {
           if (res && res.pin) { ov.hidden = true; signOut(); return; }
           if (res && res.bid) replaceBid(res.bid);
           ov.hidden = true; render(); toast((res && res.message) || 'That didn\'t go through.', !(res && res.ok));
