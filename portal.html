@@ -176,7 +176,7 @@
     var open = d.bids.filter(function (b) { return !b.closed; }), done = d.bids.filter(function (b) { return b.closed; });
     var signed = function (c) { return c.seats.length || c.waits.length || (c.rpSeats || []).length || (c.rpWaits || []).length; };
     var mine = d.classes.filter(signed);
-    var other = d.classes.filter(function (c) { return !signed(c); });
+    var other = d.classes.filter(function (c) { return !signed(c) && !c.cancelled; });
     app.innerHTML =
       '<div class="card"><div class="me"><span class="av">' + esc(initials(me.name)) + '</span><div><b>' + esc(me.name) + '</b><small>' + esc([me.call, d.email].filter(Boolean).join(' · ')) + '</small></div></div>' +
         '<div class="row2"><button type="button" class="link" id="chpin">Change PIN</button><button type="button" class="link" id="out">Sign out</button></div></div>' +
@@ -216,7 +216,8 @@
     if (c.waits.length) tags.push('<span class="tag wait">Waitlist</span>');
     if (rpS.length) tags.push('<span class="tag ok">✓ Role player</span>');
     if (rpW.length) tags.push('<span class="tag wait">Role-player waitlist</span>');
-    if (c.closed) tags.push('<span class="tag closed">Closed</span>');
+    if (c.cancelled) tags.push('<span class="tag closed">Cancelled</span>');
+    else if (c.closed) tags.push('<span class="tag closed">Closed</span>');
     else if (!c.seats.length && !c.waits.length && !rpS.length && !rpW.length) {
       if (!c.done) tags.push('<span class="tag' + (c.seatsLeft ? ' ok' : ' closed') + '">' + (c.seatsLeft ? c.seatsLeft + (c.seatsLeft === 1 ? ' seat' : ' seats') + ' left' : 'Full: waitlist') + '</span>');
       if (c.rp) tags.push('<span class="tag rp">Role players wanted' + (c.rpLeft ? ': ' + c.rpLeft + ' left' : '') + '</span>');
