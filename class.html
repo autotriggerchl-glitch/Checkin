@@ -280,6 +280,7 @@ function start() {
 
   function closedReason() {
     var c = st.cls;
+    if (c.cancelled) return 'This class was cancelled.';
     if (!c.open) return 'Sign-ups are closed. See the training officer to make a change.';
     if (c.deadline && st.today > c.deadline) return 'The sign-up deadline has passed. See the training officer to make a change.';
     return '';
@@ -292,6 +293,7 @@ function start() {
     var seat = null, wait = null;
     st.cls.dates.forEach(function (d) {
       if (isIS() && d.topic !== g) return;
+      if (d.date < st.today || d.cancelled) return; // a date already past (attended) doesn't count against a new one
       d['in'].forEach(function (x) { if (isMe(x)) seat = d; });
       d.wait.forEach(function (x, i) { if (isMe(x)) wait = { d: d, pos: i + 1 }; });
     });
@@ -429,6 +431,12 @@ function start() {
   function dateCard(d, mine, closed, also, showTopic, timeFirst) {
     var taken = d['in'].length, left = d.seats - taken, past = d.date < st.today;
     var seatHere = mine.seat === d, waitHere = mine.wait && mine.wait.d === d;
+    if (d.cancelled) {
+      return '<div class="card date" style="opacity:.8"><div class="dhead"><div>' + (showTopic ? '<p class="dtopic"><em>' + esc(d.topic) + '</em></p>' : '') +
+        '<b><s>' + esc(timeFirst ? (d.start ? d.start + (d.end ? '–' + d.end : '') : 'Session') : day(d.date)) + '</s></b><small>' + esc([times(d), d.location].filter(Boolean).join(' · ')) + '</small></div>' +
+        '<span class="seats full">Cancelled</span></div><p class="note" style="margin:0 16px 14px">This date was cancelled.' +
+        (st.me && !closed ? ' Pick another date.' : '') + '</p></div>';
+    }
     var chip = past ? '<span class="seats past">Past</span>'
       : left <= 0 ? '<span class="seats full">Full' + (d.wait.length ? ' · ' + d.wait.length + ' waiting' : '') + '</span>'
       : '<span class="seats">' + left + (left === 1 ? ' seat' : ' seats') + ' left</span>';
@@ -660,7 +668,7 @@ function start() {
     if (!d) return;
     var inGroup = function (x) { return !isIS() || x.topic === d.topic; };
     if (op === 'join') {
-      st.cls.dates.forEach(function (x) { if (inGroup(x)) x['in'] = x['in'].filter(function (y) { return !same(y); }); });
+      st.cls.dates.forEach(function (x) { if (inGroup(x) && x.date >= st.today) x['in'] = x['in'].filter(function (y) { return !same(y); }); });
       d.wait = d.wait.filter(function (y) { return !same(y); });
       d['in'].push(meOf());
     } else if (op === 'wait') {
