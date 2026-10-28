@@ -466,7 +466,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-21a';
+  var PAGE_VERSION = '2026-10-28a';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -911,14 +911,53 @@ var LOCK = (function () {
   }
 
   // Lists too long for their panel scroll slowly down, pause, and come back up.
-  var scrollers = [];
+  var scrollers = [], pins = [], pinLoop = 0;
+  // Court: the day's heading ("Today") stays at the top while its names
+  // scroll under it, until the next day's heading pushes it off.
+  function pinFrame() {
+    pinLoop = 0;
+    pins.forEach(function (p) {
+      if (!p.box.isConnected) return;
+      var m = getComputedStyle(p.inner).transform, y = 0;
+      if (m && m !== 'none') { var v = m.match(/matrix.*\((.+)\)/); if (v) { var n = v[1].split(','); y = -parseFloat(n[n.length === 16 ? 13 : 5]) || 0; } }
+      var cur = -1;
+      for (var i = 0; i < p.tops.length; i++) if (p.tops[i] <= y + 0.5) cur = i;
+      if (cur < 0 || y < 1) { p.el.style.visibility = 'hidden'; return; }
+      if (p.shown !== cur) { p.el.innerHTML = p.heads[cur].innerHTML; p.shown = cur; }
+      var push = 0, nxt = p.tops[cur + 1];
+      if (nxt != null && nxt - y + p.pad < p.el.offsetHeight) push = nxt - y + p.pad - p.el.offsetHeight;
+      p.el.style.transform = 'translateY(' + push + 'px)';
+      p.el.style.visibility = 'visible';
+    });
+    if (pins.length) pinLoop = requestAnimationFrame(pinFrame);
+  }
+  function addPin(box, inner) {
+    var heads = [].slice.call(inner.querySelectorAll('.ct-day > .day'));
+    if (heads.length < 1) return;
+    var cs = getComputedStyle(box), tile = box.closest('.tile');
+    var el = document.createElement('div');
+    el.className = 'day';
+    el.setAttribute('aria-hidden', 'true');
+    el.style.cssText = 'position:absolute;left:0;right:0;top:0;margin:0;z-index:2;visibility:hidden;pointer-events:none;' +
+      'padding:' + cs.paddingTop + ' ' + cs.paddingRight + ' .3em ' + cs.paddingLeft + ';background:' + getComputedStyle(tile).backgroundColor;
+    box.appendChild(el);
+    var padTop = parseFloat(cs.paddingTop) || 0;
+    // Where each heading sits in the list (the slide doesn't change these).
+    var top0 = inner.getBoundingClientRect().top;
+    var tops = heads.map(function (h) { return h.getBoundingClientRect().top - top0; });
+    pins.push({ box: box, inner: inner, heads: heads, tops: tops, el: el, shown: -1, pad: padTop });
+  }
   function startScrolls() {
     scrollers.forEach(function (s) { clearTimeout(s.t); });
     scrollers = [];
+    pins.forEach(function (p) { if (p.el.parentNode) p.el.parentNode.removeChild(p.el); });
+    pins = [];
+    if (pinLoop) { cancelAnimationFrame(pinLoop); pinLoop = 0; }
     if (portrait()) return;
     document.querySelectorAll('.tile .in').forEach(function (box) {
       var inner = box.firstChild, extra = inner.scrollHeight - box.clientHeight;
       if (extra <= 4) return;
+      if (inner.querySelector('.ct-day > .day')) addPin(box, inner);
       var s = { t: 0 }, speed = 28; // pixels a second
       var go = function (down) {
         var dist = down ? extra : 0, secs = extra / speed;
@@ -929,6 +968,7 @@ var LOCK = (function () {
       s.t = setTimeout(function () { go(true); }, 6000);
       scrollers.push(s);
     });
+    if (pins.length) pinLoop = requestAnimationFrame(pinFrame);
   }
 
   // ---------- Weather (National Weather Service) ----------
