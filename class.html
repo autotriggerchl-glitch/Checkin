@@ -429,7 +429,7 @@ function start() {
     return h < 5 ? 'Overnight' : h < 11 ? 'Morning' : h < 14 ? 'Midday' : h < 17 ? 'Afternoon' : 'Evening';
   }
   function dateCard(d, mine, closed, also, showTopic, timeFirst) {
-    var taken = d['in'].length, left = d.seats - taken, past = d.date < st.today;
+    var taken = d['in'].length, left = d.seats - taken, past = d.date < st.today || !!d.started;
     var seatHere = mine.seat === d, waitHere = mine.wait && mine.wait.d === d;
     if (d.cancelled) {
       return '<div class="card date" style="opacity:.8"><div class="dhead"><div>' + (showTopic ? '<p class="dtopic"><em>' + esc(d.topic) + '</em></p>' : '') +
@@ -437,7 +437,7 @@ function start() {
         '<span class="seats full">Cancelled</span></div><p class="note" style="margin:0 16px 14px">This date was cancelled.' +
         (st.me && !closed ? ' Pick another date.' : '') + '</p></div>';
     }
-    var chip = past ? '<span class="seats past">Past</span>'
+    var chip = past ? '<span class="seats past">' + (d.date < st.today ? 'Past' : 'Started') + '</span>'
       : left <= 0 ? '<span class="seats full">Full' + (d.wait.length ? ' · ' + d.wait.length + ' waiting' : '') + '</span>'
       : '<span class="seats">' + left + (left === 1 ? ' seat' : ' seats') + ' left</span>';
     var html = '<div class="card date' + (seatHere ? ' me' : waitHere ? ' mewait' : '') + '">' +
