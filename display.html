@@ -361,6 +361,18 @@
   .oc-t { color: var(--muted); font-variant-numeric: tabular-nums; }
   .oc-day + .oc-day { margin-top: .4em; }
   .oc-none { padding: .3em 0; }
+  /* Divisions at work */
+  .dw-div + .dw-div { margin-top: .5em; }
+  .dw-div .day .ct-n { color: var(--muted); font-weight: 700; text-transform: none; letter-spacing: 0; margin-left: .4em; }
+  .dw { display: flex; align-items: center; flex-wrap: wrap; gap: .2em .6em; padding: .28em 0; border-bottom: 1px solid var(--line); }
+  .dw .oc-cs { position: relative; }
+  .dw.on .oc-cs::after { content: ""; position: absolute; right: -.25em; top: -.25em; width: .55em; height: .55em; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 .12em var(--panel); }
+  .dw-n { font-weight: 700; font-size: 1.1em; }
+  .dw-r { color: var(--muted); font-size: .85em; }
+  .dw-h { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .dw.on .dw-h { color: var(--ok); }
+  .dw.done, .dw.rest, .dw.none { opacity: .5; }
+  .no-dot .dw.on .oc-cs::after { display: none; }
   .ct-day + .ct-day { margin-top: .5em; }
   .ct-n { background: var(--line); color: var(--ink); border-radius: 999px; padding: 0 .5em; font-size: .9em; letter-spacing: 0; }
   .ct-grp { border-bottom: 1px solid var(--line); padding: .25em 0; }
@@ -466,7 +478,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-28b';
+  var PAGE_VERSION = '2026-10-28c';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -553,6 +565,7 @@ var LOCK = (function () {
         (t.shifts || []).forEach(function (s) { s.rows.forEach(function (x) { sigs[s.key + '|' + rowSig(x)] = 1; }); });
         (t.rows || []).forEach(function (x) { sigs[JSON.stringify(x)] = 1; });
         (t.cars || []).forEach(function (x) { sigs[JSON.stringify(x)] = 1; });
+        (t.divs || []).forEach(function (d) { d.rows.forEach(function (x) { sigs[dwSig(d, x)] = 1; }); });
         (t.type === 'feed' ? t.list || [] : []).forEach(function (x) { sigs[JSON.stringify(x)] = 1; });
         if (!first && st.prev[k]) Object.keys(sigs).forEach(function (sg) { if (!st.prev[k][sg]) st.changed[k + '|' + sg] = now; });
         st.prev[k] = sigs;
@@ -562,6 +575,7 @@ var LOCK = (function () {
     render();
     showStatus();
   }
+  function dwSig(d, x) { return 'dw|' + d.name + '|' + x.n + '|' + x.st + '|' + (x.h || '') + '|' + (x.why || '') + '|' + (x.part || ''); }
   function isNew(bi, ti, sg) { var t = st.changed[bi + ':' + ti + '|' + sg]; return t && Date.now() - t < 2 * 60000; }
 
   // ---------- Drawing ----------
@@ -764,7 +778,7 @@ var LOCK = (function () {
 
   function tileHtml(t, bi, ti) {
     var titles = { onduty: "Who's working", staffing: 'Staffing', off: 'Off today', cruisers: 'Cruisers', training: 'Upcoming training',
-      overlaps: 'Overlaps to review', message: 'Notice', clock: '', feed: 'Latest changes', ready: 'Training readiness', oncall: 'On call', court: 'Court', holdover: 'Holdover list', events: 'Calendar' };
+      overlaps: 'Overlaps to review', message: 'Notice', clock: '', feed: 'Latest changes', ready: 'Training readiness', oncall: 'On call', court: 'Court', holdover: 'Holdover list', events: 'Calendar', divwork: 'Divisions at work' };
     var title = t.title || (t.type === 'events' && t.calName) || titles[t.type] || '';
     var sub = t.squad && /^(onduty|staffing|off|holdover)$/.test(t.type) ? t.squad : '';
     var inner = '', o = t.o || {};
@@ -883,6 +897,26 @@ var LOCK = (function () {
         }).join('') : '<p class="empty oc-none">Nothing scheduled</p>';
         return '<div class="oc-day' + (isToday ? ' today' : '') + (edays.length === 1 && isToday ? ' only' : '') + '"><div class="day">' + esc(isToday ? 'Today' : dayLabel(d.date)) + '</div>' + evs + '</div>';
       }).join('') || '<p class="empty">Nothing on the calendar.</p>';
+    } else if (t.type === 'divwork') {
+      // Divisions at work: who in each division is working today, from DTS or their usual hours.
+      var dcols = list(o, 'cols', ['cs', 'hr', 'dot', 'why']);
+      var dcnt = o.count !== 'no';
+      inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' : '<div class="' + (dcols.indexOf('dot') < 0 ? 'no-dot' : '') + '">' + (t.divs || []).map(function (d) {
+        var head = '<div class="day">' + esc(d.name) + (dcnt ? '<span class="ct-n">' + (d.now ? d.now + ' in now · ' : '') + d.working + ' working today</span>' : '') + '</div>';
+        var rows = d.rows.length ? d.rows.map(function (x) {
+          var cls = x.st === 'work' ? (x.on ? 'on' : x.done ? 'done' : 'up') : x.st;
+          var right = x.st === 'work' ? (dcols.indexOf('hr') >= 0 ? (x.done ? 'Done ' + String(x.h || '').slice(5) : x.up ? 'In at ' + String(x.h || '').slice(0, 4) : x.h) : (x.up ? 'Later' : x.done ? 'Done' : ''))
+            : x.st === 'rest' ? 'Not working today' : x.st === 'none' ? 'No schedule' : '';
+          var pills = (x.st === 'off' ? '<span class="pill lv">' + esc(dcols.indexOf('why') >= 0 ? x.why || 'Off' : 'Off') + '</span>' : '') +
+            (x.st === 'work' && x.why && dcols.indexOf('why') >= 0 ? '<span class="pill tag">' + esc(x.why) + '</span>' : '') +
+            (x.part && dcols.indexOf('why') >= 0 ? '<span class="pill lv">' + esc(x.part) + '</span>' : '');
+          return '<div class="dw ' + cls + (isNew(bi, ti, dwSig(d, x)) ? ' chg' : '') + '">' +
+            (x.cs && dcols.indexOf('cs') >= 0 ? '<span class="oc-cs">' + esc(x.cs) + '</span>' : '') +
+            '<span class="dw-n">' + esc(x.n) + '</span>' + (x.r && dcols.indexOf('rank') >= 0 ? '<span class="dw-r">' + esc(x.r) + '</span>' : '') + pills +
+            (right ? '<span class="dw-h">' + esc(right) + '</span>' : '') + '</div>';
+        }).join('') : '<p class="empty oc-none">' + (o.only === 'now' ? 'No one in right now' : 'No one working today') + '</p>';
+        return '<div class="dw-div">' + head + rows + '</div>';
+      }).join('') + '</div>';
     } else if (t.type === 'court') {
       var cdays = t.days || [];
       inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' : !cdays.length ? '<p class="empty">No one is scheduled for court.</p>' : cdays.map(function (d) {
