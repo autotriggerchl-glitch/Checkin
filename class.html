@@ -439,6 +439,7 @@ function start() {
     }
     var chip = past ? '<span class="seats past">' + (d.date < st.today ? 'Past' : 'Started') + '</span>'
       : left <= 0 ? '<span class="seats full">Full' + (d.wait.length ? ' · ' + d.wait.length + ' waiting' : '') + '</span>'
+      : d.wait.length ? '<span class="seats">' + left + (left === 1 ? ' seat' : ' seats') + ' open · for the waitlist</span>'
       : '<span class="seats">' + left + (left === 1 ? ' seat' : ' seats') + ' left</span>';
     var html = '<div class="card date' + (seatHere ? ' me' : waitHere ? ' mewait' : '') + '">' +
       '<div class="dhead"><div>' +
@@ -476,9 +477,18 @@ function start() {
           (st.confirm === confirmKey('drop')
             ? '<button type="button" class="btn warn" data-op="drop" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>Tap again to drop out</button>'
             : '<button type="button" class="drop-link" data-op="drop" data-d="' + d.id + '">Drop out</button>');
-      } else if (waitHere) {
-        b = '<span class="state wait">You\'re #' + mine.wait.pos + ' on the waitlist. If a seat opens, you move in' + (mine.seat ? ' and give up ' + esc(shortDay(mine.seat.date)) : '') + '.</span>' +
+      } else if (waitHere && left > 0) {
+        // A seat opened: the first one on the waitlist to claim it gets it.
+        b = '<span class="state ok" style="flex:1 1 100%">A seat is open! The first person on the waitlist to claim it gets it.</span>' +
+          '<button type="button" class="btn" data-op="join" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Saving…' : 'Claim this seat') + '</button>' +
+          (mine.seat ? '<span class="note" style="flex:1 1 100%">Claiming it moves you from ' + esc(shortDay(mine.seat.date)) + '.</span>' : '') +
           '<button type="button" class="drop-link" data-op="unwait" data-d="' + d.id + '">Leave the waitlist</button>';
+      } else if (waitHere) {
+        b = '<span class="state wait">You\'re #' + mine.wait.pos + ' on the waitlist. If a seat opens, everyone on the waitlist gets an email, and the first to claim it gets it' + (mine.seat ? ' (you\'d give up ' + esc(shortDay(mine.seat.date)) + ')' : '') + '.</span>' +
+          '<button type="button" class="drop-link" data-op="unwait" data-d="' + d.id + '">Leave the waitlist</button>';
+      } else if (left > 0 && d.wait.length) {
+        b = '<span class="note" style="flex:1 1 100%">A seat is open, but it\'s held for the people on the waitlist.</span>' +
+          '<button type="button" class="btn ghost" data-op="wait" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Saving…' : 'Join the waitlist') + '</button>';
       } else if (left > 0) {
         var sw = !!mine.seat;
         b = '<button type="button" class="btn' + (sw ? ' ghost' : '') + '" data-op="join" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>' +
