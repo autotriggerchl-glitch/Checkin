@@ -478,7 +478,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-28c';
+  var PAGE_VERSION = '2026-10-28d';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -592,7 +592,7 @@ var LOCK = (function () {
     if (!d || !(d.boards || []).length) { stop('Display', 'No boards are picked for this display yet.'); return; }
     var bi = st.board, item = d.boards[bi], b = item.board, now = new Date();
     var layout = { one: 1, two: 2, three: 3, four: 4, side: 2 }[b.layout] ? b.layout : 'one';
-    var msgs = d.messages || [];
+    var msgs = b.msgs || d.messages || [];   // the messages picked for this board
     app.innerHTML = '<div class="screen">' +
       '<div class="hd"><img src="' + PATCH + '" alt="" onerror="this.style.visibility=\'hidden\'">' +
         '<div style="min-width:0"><div class="dept">' + esc(DEPT) + '</div><div class="bname">' + esc(b.name) + '</div></div>' +
