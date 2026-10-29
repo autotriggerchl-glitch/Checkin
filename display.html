@@ -466,7 +466,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-28a';
+  var PAGE_VERSION = '2026-10-28b';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -764,8 +764,8 @@ var LOCK = (function () {
 
   function tileHtml(t, bi, ti) {
     var titles = { onduty: "Who's working", staffing: 'Staffing', off: 'Off today', cruisers: 'Cruisers', training: 'Upcoming training',
-      overlaps: 'Overlaps to review', message: 'Notice', clock: '', feed: 'Latest changes', ready: 'Training readiness', oncall: 'On call', court: 'Court', holdover: 'Holdover list' };
-    var title = t.title || titles[t.type] || '';
+      overlaps: 'Overlaps to review', message: 'Notice', clock: '', feed: 'Latest changes', ready: 'Training readiness', oncall: 'On call', court: 'Court', holdover: 'Holdover list', events: 'Calendar' };
+    var title = t.title || (t.type === 'events' && t.calName) || titles[t.type] || '';
     var sub = t.squad && /^(onduty|staffing|off|holdover)$/.test(t.type) ? t.squad : '';
     var inner = '', o = t.o || {};
     if (t.type === 'onduty') {
@@ -872,6 +872,17 @@ var LOCK = (function () {
         var isToday = i === 0 && !t.skipToday;
         return '<div class="oc-day' + (isToday ? ' today' : '') + (odays.length === 1 && isToday ? ' only' : '') + '">' + head + ppl + '</div>';
       }).join('');
+    } else if (t.type === 'events') {
+      // A shared calendar's events, by day.
+      var esw = list(o, 'show', ['time']), edays = t.days || [];
+      inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' : edays.map(function (d) {
+        var isToday = d.date === t.today;
+        var evs = d.events.length ? d.events.map(function (e) {
+          return '<div class="oc' + (isToday && e.now ? ' now' : '') + '"><span class="oc-n">' + esc(e.t) + '</span>' +
+            (e.time && esw.indexOf('time') >= 0 ? '<span class="oc-t">' + esc(e.time) + '</span>' : '') + '</div>';
+        }).join('') : '<p class="empty oc-none">Nothing scheduled</p>';
+        return '<div class="oc-day' + (isToday ? ' today' : '') + (edays.length === 1 && isToday ? ' only' : '') + '"><div class="day">' + esc(isToday ? 'Today' : dayLabel(d.date)) + '</div>' + evs + '</div>';
+      }).join('') || '<p class="empty">Nothing on the calendar.</p>';
     } else if (t.type === 'court') {
       var cdays = t.days || [];
       inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' : !cdays.length ? '<p class="empty">No one is scheduled for court.</p>' : cdays.map(function (d) {
