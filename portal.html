@@ -102,7 +102,9 @@
   /* Tasks */
   .bid.tk { border-left-color: var(--focus); }
   .bid.tk.late { border-left-color: var(--err); } .bid.tk.soon { border-left-color: var(--gold); } .bid.tk.dn { border-left-color: var(--ok); }
-  .st.late { background: var(--errbg); color: var(--err); } .st.back { background: var(--waitbg); color: var(--wait); }
+  .st.late { background: var(--errbg); color: var(--err); } .st.back, .st.pend { background: var(--waitbg); color: var(--wait); }
+  .bid.tk.pd { border-left-color: var(--wait); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   textarea { font: inherit; width: 100%; min-height: 90px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); resize: vertical; }
   textarea:focus { outline: none; border-color: var(--focus); }
 </style>
@@ -199,7 +201,9 @@
     $('refresh').onclick = function () { loadHome(); toast('Up to date.'); };
     app.querySelectorAll('[data-bid]').forEach(function (b) { b.onclick = function () { openBid(b.getAttribute('data-bid')); }; });
     app.querySelectorAll('[data-wd]').forEach(function (b) { b.onclick = function () { withdraw(b.getAttribute('data-wd')); }; });
-    app.querySelectorAll('[data-tk]').forEach(function (b) { b.onclick = function () { taskDone(b.getAttribute('data-tk')); }; });
+    app.querySelectorAll('[data-tk]').forEach(function (b) { b.onclick = function () { taskDone(b.getAttribute('data-tk'), 'done'); }; });
+    app.querySelectorAll('[data-tkp]').forEach(function (b) { b.onclick = function () { taskDone(b.getAttribute('data-tkp'), 'pending'); }; });
+    app.querySelectorAll('[data-tkc]').forEach(function (b) { b.onclick = function () { taskDone(b.getAttribute('data-tkc'), 'clear'); }; });
   }
 
   // ---------- Tasks: the ones for your division, role or you ----------
@@ -210,27 +214,38 @@
     return '<h2>Tasks <em>' + todo + '</em></h2>' + L.map(taskCard).join('');
   }
   function taskCard(t) {
-    var dd = dayDiff(t.due), late = t.st !== 'done' && dd != null && dd < 0, soon = t.st !== 'done' && dd != null && dd >= 0 && dd <= 2;
+    var dd = dayDiff(t.due), late = t.st !== 'done' && dd != null && dd < 0, soon = t.st !== 'done' && dd != null && dd >= 0 && dd <= 2, pd = t.st !== 'done' && t.pend;
     var dueText = t.due ? 'Due ' + md(t.due) + (t.time ? ' by ' + t.time : '') + (t.st === 'done' || dd == null ? '' : dd < 0 ? ' · ' + (-dd) + (dd === -1 ? ' day' : ' days') + ' overdue' : dd === 0 ? ' · today' : dd === 1 ? ' · tomorrow' : ' · in ' + dd + ' days') : '';
     var status = t.st === 'done' ? '<div class="st in"><b>✓ Done</b>' + (t.doneBy ? ' by ' + esc(t.doneBy) : '') + (t.doneAt ? ' (' + esc(when(t.doneAt)) + ')' : '') + '<br>Waiting for a supervisor to confirm it.' + (t.note ? '<br><i>' + esc(t.note) + '</i>' : '') + '</div>'
       : t.st === 'back' ? '<div class="st back"><b>Sent back:</b> ' + esc(t.back || 'see your supervisor') + '</div>'
       : late ? '<div class="st late"><b>Overdue</b></div>' : '';
-    return '<div class="bid tk' + (t.st === 'done' ? ' dn' : late ? ' late' : soon ? ' soon' : '') + '"><div class="hd"><b>' + esc(t.title) + '</b><small>' +
+    if (pd) status += '<div class="st pend"><b>Pending</b>' + (t.pend.by ? ' · ' + esc(t.pend.by) : '') + (t.pend.at ? ' (' + esc(when(t.pend.at)) + ')' : '') + '<br>' + esc(t.pend.note || '') + '</div>';
+    return '<div class="bid tk' + (t.st === 'done' ? ' dn' : pd ? ' pd' : late ? ' late' : soon ? ' soon' : '') + '"><div class="hd"><b>' + esc(t.title) + '</b><small>' +
         esc([dueText, t.forName, t.rep].filter(Boolean).join(' · ')) + '</small></div>' +
       (t.notes ? '<p class="det">' + esc(t.notes) + '</p>' : '') + status +
-      (t.st === 'done' ? '<div style="height:14px"></div>' : '<div class="acts"><button type="button" class="btn" data-tk="' + esc(t.id) + '">Mark done</button></div>') + '</div>';
+      (t.st === 'done' ? '<div style="height:14px"></div>' : '<div class="acts"><button type="button" class="btn" data-tk="' + esc(t.id) + '">Mark done</button>' +
+        '<div class="two"><button type="button" class="btn ghost" data-tkp="' + esc(t.id) + '">' + (pd ? 'Update the issue' : 'Mark pending') + '</button>' +
+        (pd ? '<button type="button" class="btn ghost" data-tkc="' + esc(t.id) + '">Not pending</button>' : '<span></span>') + '</div></div>') + '</div>';
   }
-  function taskDone(id) {
+  // act: done, pending (there's an issue: say what), or clear (not pending anymore).
+  function taskDone(id, act) {
     var t = (st.data.tasks || []).filter(function (x) { return x.id === id; })[0]; if (!t) return;
     var ov = $('ov');
-    ov.innerHTML = '<div class="card"><h1>Mark it done?</h1><p class="note"><b>' + esc(t.title) + '</b><br>A supervisor confirms it before it comes off the board.</p>' +
-      '<label class="field"><span>Note (optional)</span><textarea id="tkn" maxlength="500" placeholder="What was done, anything they should know"></textarea></label>' +
-      '<div class="btns"><button type="button" class="btn ghost" id="tkx">Cancel</button><button type="button" class="btn" id="tkgo">Mark done</button></div></div>';
+    var head = act === 'pending' ? 'Mark it pending?' : act === 'clear' ? 'Not pending anymore?' : 'Mark it done?';
+    var sub = act === 'pending' ? 'Something is holding it up. Your supervisor sees the issue, and it stays on your list.' : act === 'clear' ? 'The issue is taken care of. It goes back to a normal open task.' : 'A supervisor confirms it before it comes off the board.';
+    var label = act === 'pending' ? 'What\'s the issue?' : 'Note (optional)';
+    var ph = act === 'pending' ? 'Waiting on the vendor, missing paperwork, need access…' : act === 'clear' ? 'What changed' : 'What was done, anything they should know';
+    var go = act === 'pending' ? 'Mark pending' : act === 'clear' ? 'Not pending' : 'Mark done';
+    ov.innerHTML = '<div class="card"><h1>' + head + '</h1><p class="note"><b>' + esc(t.title) + '</b><br>' + sub + '</p>' +
+      '<label class="field"><span>' + label + '</span><textarea id="tkn" maxlength="500" placeholder="' + esc(ph) + '">' + (act === 'pending' && t.pend ? esc(t.pend.note || '') : '') + '</textarea></label>' +
+      '<p class="err" id="tke"></p>' +
+      '<div class="btns"><button type="button" class="btn ghost" id="tkx">Cancel</button><button type="button" class="btn" id="tkgo">' + go + '</button></div></div>';
     ov.hidden = false;
     $('tkx').onclick = function () { ov.hidden = true; };
     $('tkgo').onclick = function () {
+      if (act === 'pending' && !$('tkn').value.trim()) { $('tke').textContent = 'Say what the issue is.'; return; }
       this.disabled = true; this.textContent = 'Sending…';
-      api('portalTask', { email: st.email, token: st.token, t: id, note: $('tkn').value }).then(function (res) {
+      api('portalTask', { email: st.email, token: st.token, t: id, note: $('tkn').value, act: act }).then(function (res) {
         if (res && res.pin) { ov.hidden = true; signOut(); return; }
         if (res && res.task) st.data.tasks = st.data.tasks.map(function (x) { return x.id === id ? res.task : x; });
         if (res && res.gone) st.data.tasks = st.data.tasks.filter(function (x) { return x.id !== id; });
