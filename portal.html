@@ -99,6 +99,12 @@
     max-width: calc(100% - 32px); padding: 12px 16px; border-radius: 10px; background: #14213A; color: #fff; font-size: 15px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
   .toast.bad { background: #B3261E; }
   .toast[hidden] { display: none; }
+  /* Tasks */
+  .bid.tk { border-left-color: var(--focus); }
+  .bid.tk.late { border-left-color: var(--err); } .bid.tk.soon { border-left-color: var(--gold); } .bid.tk.dn { border-left-color: var(--ok); }
+  .st.late { background: var(--errbg); color: var(--err); } .st.back { background: var(--waitbg); color: var(--wait); }
+  textarea { font: inherit; width: 100%; min-height: 90px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); resize: vertical; }
+  textarea:focus { outline: none; border-color: var(--focus); }
 </style>
 </head>
 <body>
@@ -180,6 +186,7 @@
     app.innerHTML =
       '<div class="card"><div class="me"><span class="av">' + esc(initials(me.name)) + '</span><div><b>' + esc(me.name) + '</b><small>' + esc([me.call, d.email].filter(Boolean).join(' · ')) + '</small></div></div>' +
         '<div class="row2"><button type="button" class="link" id="chpin">Change PIN</button><button type="button" class="link" id="out">Sign out</button></div></div>' +
+      tasksHtml(d.tasks || []) +
       '<h2>Shift bids <em>' + open.length + '</em></h2>' +
       (open.length ? open.map(bidCard).join('') : '<p class="empty">No shift bids are open right now.</p>') +
       (done.length ? done.map(bidCard).join('') : '') +
@@ -192,6 +199,46 @@
     $('refresh').onclick = function () { loadHome(); toast('Up to date.'); };
     app.querySelectorAll('[data-bid]').forEach(function (b) { b.onclick = function () { openBid(b.getAttribute('data-bid')); }; });
     app.querySelectorAll('[data-wd]').forEach(function (b) { b.onclick = function () { withdraw(b.getAttribute('data-wd')); }; });
+    app.querySelectorAll('[data-tk]').forEach(function (b) { b.onclick = function () { taskDone(b.getAttribute('data-tk')); }; });
+  }
+
+  // ---------- Tasks: the ones for your division, role or you ----------
+  function dayDiff(s) { var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); if (!m) return null; var a = new Date(); a.setHours(12, 0, 0, 0); return Math.round((new Date(+m[1], +m[2] - 1, +m[3], 12) - a) / 86400000); }
+  function tasksHtml(L) {
+    if (!L.length) return '';
+    var todo = L.filter(function (t) { return t.st !== 'done'; }).length;
+    return '<h2>Tasks <em>' + todo + '</em></h2>' + L.map(taskCard).join('');
+  }
+  function taskCard(t) {
+    var dd = dayDiff(t.due), late = t.st !== 'done' && dd != null && dd < 0, soon = t.st !== 'done' && dd != null && dd >= 0 && dd <= 2;
+    var dueText = t.due ? 'Due ' + md(t.due) + (t.time ? ' by ' + t.time : '') + (t.st === 'done' || dd == null ? '' : dd < 0 ? ' · ' + (-dd) + (dd === -1 ? ' day' : ' days') + ' overdue' : dd === 0 ? ' · today' : dd === 1 ? ' · tomorrow' : ' · in ' + dd + ' days') : '';
+    var status = t.st === 'done' ? '<div class="st in"><b>✓ Done</b>' + (t.doneBy ? ' by ' + esc(t.doneBy) : '') + (t.doneAt ? ' (' + esc(when(t.doneAt)) + ')' : '') + '<br>Waiting for a supervisor to confirm it.' + (t.note ? '<br><i>' + esc(t.note) + '</i>' : '') + '</div>'
+      : t.st === 'back' ? '<div class="st back"><b>Sent back:</b> ' + esc(t.back || 'see your supervisor') + '</div>'
+      : late ? '<div class="st late"><b>Overdue</b></div>' : '';
+    return '<div class="bid tk' + (t.st === 'done' ? ' dn' : late ? ' late' : soon ? ' soon' : '') + '"><div class="hd"><b>' + esc(t.title) + '</b><small>' +
+        esc([dueText, t.forName, t.rep].filter(Boolean).join(' · ')) + '</small></div>' +
+      (t.notes ? '<p class="det">' + esc(t.notes) + '</p>' : '') + status +
+      (t.st === 'done' ? '<div style="height:14px"></div>' : '<div class="acts"><button type="button" class="btn" data-tk="' + esc(t.id) + '">Mark done</button></div>') + '</div>';
+  }
+  function taskDone(id) {
+    var t = (st.data.tasks || []).filter(function (x) { return x.id === id; })[0]; if (!t) return;
+    var ov = $('ov');
+    ov.innerHTML = '<div class="card"><h1>Mark it done?</h1><p class="note"><b>' + esc(t.title) + '</b><br>A supervisor confirms it before it comes off the board.</p>' +
+      '<label class="field"><span>Note (optional)</span><textarea id="tkn" maxlength="500" placeholder="What was done, anything they should know"></textarea></label>' +
+      '<div class="btns"><button type="button" class="btn ghost" id="tkx">Cancel</button><button type="button" class="btn" id="tkgo">Mark done</button></div></div>';
+    ov.hidden = false;
+    $('tkx').onclick = function () { ov.hidden = true; };
+    $('tkgo').onclick = function () {
+      this.disabled = true; this.textContent = 'Sending…';
+      api('portalTask', { email: st.email, token: st.token, t: id, note: $('tkn').value }).then(function (res) {
+        if (res && res.pin) { ov.hidden = true; signOut(); return; }
+        if (res && res.task) st.data.tasks = st.data.tasks.map(function (x) { return x.id === id ? res.task : x; });
+        if (res && res.gone) st.data.tasks = st.data.tasks.filter(function (x) { return x.id !== id; });
+        store.set('portal-home', JSON.stringify(st.data));
+        ov.hidden = true; render(); toast((res && res.message) || 'That didn\'t go through.', !(res && res.ok));
+      }, function () { ov.hidden = true; toast('Couldn\'t reach the portal. Try again.', true); });
+    };
+    setTimeout(function () { var n = $('tkn'); if (n) n.focus(); }, 50);
   }
   function opLabel(b, id) { var o = b.openings.filter(function (x) { return x.id === id; })[0]; return o ? o.label : id; }
   function bidCard(b) {
