@@ -361,6 +361,19 @@
   .oc-t { color: var(--muted); font-variant-numeric: tabular-nums; }
   .oc-day + .oc-day { margin-top: .4em; }
   .oc-none { padding: .3em 0; }
+  /* Admin tasks */
+  .tk-sum { display: flex; flex-wrap: wrap; gap: .3em 1.2em; margin: 0 0 .5em; font-weight: 700; color: var(--muted); }
+  .tk-sum b { font-size: 1.4em; color: var(--ink); margin-right: .2em; } .tk-sum .bad b { color: var(--err); } .tk-sum .ok b { color: var(--ok); }
+  .tk { display: grid; grid-template-columns: 1.4em 1fr auto; align-items: baseline; gap: .1em .5em; padding: .35em 0; border-bottom: 1px solid var(--line); }
+  .tk .tk-bx { box-sizing: border-box; width: 1.1em; height: 1.1em; padding: 0; line-height: 1; border: .14em solid var(--muted); border-radius: .2em; align-self: center; display: grid; place-items: center; font-size: .9em; font-weight: 900; }
+  .tk.late .tk-bx { border-color: var(--err); }
+  .tk.done .tk-bx { border-color: var(--ok); background: var(--ok); color: #fff; }
+  .tk-t { font-weight: 700; font-size: 1.1em; }
+  .tk-s { grid-column: 2 / -1; color: var(--muted); font-size: .85em; }
+  .tk-d { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+  .tk.late .tk-d { color: var(--err); }
+  .tk.done .tk-t { color: var(--muted); }
+  .tk.done .tk-d { color: var(--ok); }
   /* Divisions at work */
   .dw-div + .dw-div { margin-top: .5em; }
   .dw-div .day .ct-n { color: var(--muted); font-weight: 700; text-transform: none; letter-spacing: 0; margin-left: .4em; }
@@ -478,7 +491,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-28d';
+  var PAGE_VERSION = '2026-10-28e';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -778,7 +791,7 @@ var LOCK = (function () {
 
   function tileHtml(t, bi, ti) {
     var titles = { onduty: "Who's working", staffing: 'Staffing', off: 'Off today', cruisers: 'Cruisers', training: 'Upcoming training',
-      overlaps: 'Overlaps to review', message: 'Notice', clock: '', feed: 'Latest changes', ready: 'Training readiness', oncall: 'On call', court: 'Court', holdover: 'Holdover list', events: 'Calendar', divwork: 'Divisions at work' };
+      overlaps: 'Overlaps to review', message: 'Notice', clock: '', feed: 'Latest changes', ready: 'Training readiness', oncall: 'On call', court: 'Court', holdover: 'Holdover list', events: 'Calendar', divwork: 'Divisions at work', tasks: 'Tasks' };
     var title = t.title || (t.type === 'events' && t.calName) || titles[t.type] || '';
     var sub = t.squad && /^(onduty|staffing|off|holdover)$/.test(t.type) ? t.squad : '';
     var inner = '', o = t.o || {};
@@ -897,6 +910,22 @@ var LOCK = (function () {
         }).join('') : '<p class="empty oc-none">Nothing scheduled</p>';
         return '<div class="oc-day' + (isToday ? ' today' : '') + (edays.length === 1 && isToday ? ' only' : '') + '"><div class="day">' + esc(isToday ? 'Today' : dayLabel(d.date)) + '</div>' + evs + '</div>';
       }).join('') || '<p class="empty">Nothing on the calendar.</p>';
+    } else if (t.type === 'tasks') {
+      // Admin tasks: overdue in red, then by due date; done ones wait for a supervisor to confirm.
+      var tc = t.counts || {}, trs = t.rows || [];
+      var tdue = function (x) {
+        if (x.st === 'done') return 'Done' + (x.by ? ' · ' + x.by : '');
+        var dd = Math.round((new Date(x.due + 'T12:00:00') - new Date(t.today + 'T12:00:00')) / 86400000);
+        return (dd < 0 ? (-dd) + (dd === -1 ? ' day' : ' days') + ' late' : dd === 0 ? 'Today' : dd === 1 ? 'Tomorrow' : dayLabel(x.due)) + (x.time && dd >= 0 ? ' ' + x.time : '');
+      };
+      inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' :
+        '<div class="tk-sum">' + (tc.late ? '<span class="bad"><b>' + tc.late + '</b>overdue</span>' : '') + '<span><b>' + (tc.open || 0) + '</b>to do</span>' +
+          (tc.done ? '<span class="ok"><b>' + tc.done + '</b>done, to confirm</span>' : '') + '</div>' +
+        (trs.length ? trs.map(function (x) {
+          var sub = [x.st === 'back' ? 'Sent back' : '', x.fn || '', x.notes || ''].filter(Boolean).join(' · ');
+          return '<div class="tk ' + (x.st === 'done' ? 'done' : x.late ? 'late' : '') + (isNew(bi, ti, JSON.stringify(x)) ? ' chg' : '') + '"><span class="tk-bx">' + (x.st === 'done' ? '✓' : '') + '</span>' +
+            '<span class="tk-t">' + esc(x.t) + '</span><span class="tk-d">' + esc(tdue(x)) + '</span>' + (sub ? '<span class="tk-s">' + esc(sub) + '</span>' : '') + '</div>';
+        }).join('') : '<p class="empty">Nothing due. All caught up.</p>');
     } else if (t.type === 'divwork') {
       // Divisions at work: who in each division is working today, from DTS or their usual hours.
       var dcols = list(o, 'cols', ['cs', 'hr', 'dot', 'why']);
