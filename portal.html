@@ -41,7 +41,7 @@
   .btn:disabled { opacity: .55; }
   .field { display: block; margin: 12px 0 0; }
   .field span { display: block; font-size: 14px; font-weight: 700; margin: 0 0 4px; }
-  input[type=email], input[type=text], input[type=password] {
+  input[type=email], input[type=text], input[type=password], input[type=date] {
     width: 100%; min-height: 50px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--field); font-size: 17px; color: var(--ink); }
   input:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px rgba(47, 111, 214, .2); }
   input.pin { letter-spacing: 8px; font-weight: 700; font-size: 20px; }
@@ -105,6 +105,8 @@
   .st.late { background: var(--errbg); color: var(--err); } .st.back, .st.pend { background: var(--waitbg); color: var(--wait); }
   .bid.tk.pd { border-left-color: var(--wait); }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  select.sel { width: 100%; min-height: 50px; padding: 0 12px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--field); font-size: 16px; color: var(--ink); }
+  label.chk { display: flex; gap: 10px; align-items: center; margin: 14px 0 0; font-size: 15px; } label.chk input { width: 22px; height: 22px; min-height: 0; flex: none; }
   textarea { font: inherit; width: 100%; min-height: 90px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); resize: vertical; }
   textarea:focus { outline: none; border-color: var(--focus); }
 </style>
@@ -188,7 +190,7 @@
     app.innerHTML =
       '<div class="card"><div class="me"><span class="av">' + esc(initials(me.name)) + '</span><div><b>' + esc(me.name) + '</b><small>' + esc([me.call, d.email].filter(Boolean).join(' · ')) + '</small></div></div>' +
         '<div class="row2"><button type="button" class="link" id="chpin">Change PIN</button><button type="button" class="link" id="out">Sign out</button></div></div>' +
-      tasksHtml(d.tasks || []) +
+      tasksHtml(d.tasks || [], d.make) +
       '<h2>Shift bids <em>' + open.length + '</em></h2>' +
       (open.length ? open.map(bidCard).join('') : '<p class="empty">No shift bids are open right now.</p>') +
       (done.length ? done.map(bidCard).join('') : '') +
@@ -202,16 +204,18 @@
     app.querySelectorAll('[data-bid]').forEach(function (b) { b.onclick = function () { openBid(b.getAttribute('data-bid')); }; });
     app.querySelectorAll('[data-wd]').forEach(function (b) { b.onclick = function () { withdraw(b.getAttribute('data-wd')); }; });
     app.querySelectorAll('[data-tk]').forEach(function (b) { b.onclick = function () { taskDone(b.getAttribute('data-tk'), 'done'); }; });
+    if ($('tk-new')) $('tk-new').onclick = taskNew;
     app.querySelectorAll('[data-tkp]').forEach(function (b) { b.onclick = function () { taskDone(b.getAttribute('data-tkp'), 'pending'); }; });
     app.querySelectorAll('[data-tkc]').forEach(function (b) { b.onclick = function () { taskDone(b.getAttribute('data-tkc'), 'clear'); }; });
   }
 
   // ---------- Tasks: the ones for your division, role or you ----------
   function dayDiff(s) { var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); if (!m) return null; var a = new Date(); a.setHours(12, 0, 0, 0); return Math.round((new Date(+m[1], +m[2] - 1, +m[3], 12) - a) / 86400000); }
-  function tasksHtml(L) {
-    if (!L.length) return '';
+  function tasksHtml(L, make) {
+    if (!L.length && !make) return '';
     var todo = L.filter(function (t) { return t.st !== 'done'; }).length;
-    return '<h2>Tasks <em>' + todo + '</em></h2>' + L.map(taskCard).join('');
+    return '<h2>Tasks <em>' + todo + '</em>' + (make ? '<button type="button" class="link" id="tk-new" style="margin-left:auto">+ New task</button>' : '') + '</h2>' +
+      (L.length ? L.map(taskCard).join('') : '<p class="empty">No tasks for you right now.</p>');
   }
   function taskCard(t) {
     var dd = dayDiff(t.due), late = t.st !== 'done' && dd != null && dd < 0, soon = t.st !== 'done' && dd != null && dd >= 0 && dd <= 2, pd = t.st !== 'done' && t.pend;
@@ -226,6 +230,42 @@
       (t.st === 'done' ? '<div style="height:14px"></div>' : '<div class="acts"><button type="button" class="btn" data-tk="' + esc(t.id) + '">Mark done</button>' +
         '<div class="two"><button type="button" class="btn ghost" data-tkp="' + esc(t.id) + '">' + (pd ? 'Update the issue' : 'Mark pending') + '</button>' +
         (pd ? '<button type="button" class="btn ghost" data-tkc="' + esc(t.id) + '">Not pending</button>' : '<span></span>') + '</div></div>') + '</div>';
+  }
+  // ---------- New task (Admins and anyone with the Tasks right) ----------
+  function taskNew() {
+    var mk = st.data.make; if (!mk) return;
+    var ov = $('ov');
+    var d0 = new Date(); d0.setDate(d0.getDate() + 7);
+    var iso = function (d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); };
+    var opt = function (v, n) { return '<option value="' + esc(v) + '">' + esc(n) + '</option>'; };
+    ov.innerHTML = '<div class="card"><h1>New task</h1><p class="note">It goes to the people it\'s for here on the portal, and on the TV task boards.</p>' +
+      '<label class="field"><span>Task</span><input type="text" id="nt-t" maxlength="120" autocomplete="off" placeholder="Monthly evidence audit"></label>' +
+      '<label class="field"><span>Notes (optional)</span><textarea id="nt-n" maxlength="1500"></textarea></label>' +
+      '<label class="field"><span>For</span><select id="nt-f" class="sel"><option value="">Pick who it\'s for</option>' +
+        (mk.groups.length ? '<optgroup label="A division or role (anyone in it can clear it)">' + mk.groups.map(function (g) { return opt(g.v, g.name); }).join('') + '</optgroup>' : '') +
+        '<optgroup label="One person">' + mk.people.map(function (g) { return opt(g.v, g.name); }).join('') + '</optgroup></select></label>' +
+      '<div class="two"><label class="field"><span>Due</span><input type="date" id="nt-d" min="' + iso(new Date()) + '" value="' + iso(d0) + '"></label>' +
+        '<label class="field"><span>By (optional)</span><input type="text" id="nt-h" inputmode="numeric" maxlength="5" placeholder="1600"></label></div>' +
+      '<label class="field"><span>Repeats</span><select id="nt-r" class="sel">' + opt('none', 'No, one time') + opt('daily', 'Every day') + opt('weekly', 'Every week') + opt('monthly', 'Every month') + opt('yearly', 'Every year') + '</select></label>' +
+      '<label class="chk"><input type="checkbox" id="nt-e" checked> Reminder emails: the day before it\'s due, and when it\'s overdue</label>' +
+      '<p class="err" id="nt-err"></p>' +
+      '<div class="btns"><button type="button" class="btn ghost" id="ntx">Cancel</button><button type="button" class="btn" id="ntgo">Make the task</button></div></div>';
+    ov.hidden = false;
+    $('ntx').onclick = function () { ov.hidden = true; };
+    $('ntgo').onclick = function () {
+      var q = { title: $('nt-t').value.trim(), notes: $('nt-n').value, forv: $('nt-f').value, due: $('nt-d').value, time: $('nt-h').value.trim(), rep: $('nt-r').value, rem: $('nt-e').checked };
+      if (!q.title) { $('nt-err').textContent = 'Give the task a name.'; return; }
+      if (!q.forv) { $('nt-err').textContent = 'Pick who it\'s for.'; return; }
+      if (!q.due) { $('nt-err').textContent = 'Pick the date it\'s due.'; return; }
+      var b = this; b.disabled = true; b.textContent = 'Sending…';
+      api('portalTaskNew', { email: st.email, token: st.token, task: q }).then(function (res) {
+        if (res && res.pin) { ov.hidden = true; signOut(); return; }
+        if (!res || !res.ok) { b.disabled = false; b.textContent = 'Make the task'; $('nt-err').textContent = (res && res.message) || 'That didn\'t go through.'; return; }
+        ov.hidden = true; toast(res.message || 'Sent.');
+        setTimeout(function () { loadHome(true); }, 150000);   // it's on the list after the Duty Roster's next check
+      }, function () { b.disabled = false; b.textContent = 'Make the task'; $('nt-err').textContent = 'Couldn\'t reach the portal. Try again.'; });
+    };
+    setTimeout(function () { var n = $('nt-t'); if (n) n.focus(); }, 50);
   }
   // act: done, pending (there's an issue: say what), or clear (not pending anymore).
   function taskDone(id, act) {
