@@ -392,6 +392,27 @@
   .dw.done, .dw.rest, .dw.none { opacity: .5; }
   .no-dot .dw.on .oc-cs::after { display: none; }
   .ct-day + .ct-day { margin-top: .5em; }
+  /* Divisions at work (by title, details and overtime on their own) */
+  .dw2-div + .dw2-div { margin-top: .7em; }
+  .dw2-dh { display: flex; align-items: baseline; flex-wrap: wrap; gap: .2em .8em; padding: .35em .6em; margin: 0 0 .15em; border-radius: .35em; background: var(--blue); color: #fff; }
+  .t-blues .dw2-dh { background: #14284B; } .t-blues.dark .dw2-dh { background: #2B4677; }
+  .dw2-dn { font-weight: 800; font-size: 1.05em; letter-spacing: .05em; text-transform: uppercase; }
+  .dw2-dc { margin-left: auto; font-size: .8em; font-weight: 600; opacity: .9; } .dw2-dc b { font-size: 1.15em; } .dw2-dc i { display: inline-block; width: .3em; height: .3em; margin: 0 .35em; border-radius: 50%; background: currentColor; vertical-align: middle; opacity: .6; }
+  .dw2-th { display: flex; align-items: center; gap: .5em; margin: .55em 0 .1em; padding: 0 .1em .15em; border-bottom: 2px solid var(--gold); color: var(--gold); font-size: .78em; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+  .dw2-th span { padding: 0 .45em; border-radius: 999px; background: var(--panel2); color: var(--muted); font-size: .95em; letter-spacing: 0; }
+  .dw2-th.xh { color: var(--warn); border-bottom-color: var(--warn); }
+  .dw2 { display: grid; grid-template-columns: 3.4em 1fr auto; align-items: center; gap: .1em .6em; padding: .3em .1em; border-bottom: 1px solid var(--line); }
+  .dw2-cs .oc-cs { position: relative; display: inline-block; min-width: 2.6em; text-align: center; }
+  .dw2.on .dw2-cs .oc-cs::after { content: ""; position: absolute; right: -.28em; top: -.28em; width: .55em; height: .55em; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 .12em var(--panel); }
+  .no-dot .dw2.on .dw2-cs .oc-cs::after { display: none; }
+  .dw2-n { min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: .1em .5em; }
+  .dw2-n b { font-size: 1.1em; } .dw2-n small { color: var(--muted); font-size: .8em; font-weight: 600; } .dw2-n .pill { font-size: .72em; }
+  .dw2-n small.dw2-w { flex-basis: 100%; color: var(--warn); font-weight: 700; }
+  .dw2-h { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--muted); line-height: 1.1; white-space: nowrap; }
+  .dw2-h small { display: block; font-size: .62em; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; opacity: .85; }
+  .dw2.on .dw2-h { color: var(--ok); }
+  .dw2.off .dw2-h { color: var(--warn); }
+  .dw2.done, .dw2.rest, .dw2.none { opacity: .5; }
   .ct-n { background: var(--line); color: var(--ink); border-radius: 999px; padding: 0 .5em; font-size: .9em; letter-spacing: 0; }
   .ct-grp { border-bottom: 1px solid var(--line); padding: .25em 0; }
   .ct-h { display: flex; flex-wrap: wrap; gap: .1em 1em; color: var(--muted); font-size: .85em; }
@@ -496,7 +517,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-28g';
+  var PAGE_VERSION = '2026-10-29a';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -936,24 +957,43 @@ var LOCK = (function () {
             '<span class="tk-t">' + esc(x.t) + '</span><span class="tk-d"><small>' + esc(tdue(x)[0]) + '</small>' + esc(tdue(x)[1]) + '</span>' + (sub ? '<span class="tk-s">' + sub + '</span>' : '') + '</div>';
         }).join('') : '<p class="empty">Nothing due. All caught up.</p>');
     } else if (t.type === 'divwork') {
-      // Divisions at work: who in each division is working today, from DTS or their usual hours.
+      // Divisions at work: each division under its own band, people grouped by their title
+      // (from the Divisions board), and details / overtime listed on their own with their own hours.
       var dcols = list(o, 'cols', ['cs', 'hr', 'dot', 'why']);
       var dcnt = o.count !== 'no';
-      inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' : '<div class="' + (dcols.indexOf('dot') < 0 ? 'no-dot' : '') + '">' + (t.divs || []).map(function (d) {
-        var head = '<div class="day">' + esc(d.name) + (dcnt ? '<span class="ct-n">' + (d.now ? d.now + ' in now · ' : '') + d.working + ' working today</span>' : '') + '</div>';
-        var rows = d.rows.length ? d.rows.map(function (x) {
-          var cls = x.st === 'work' ? (x.on ? 'on' : x.done ? 'done' : 'up') : x.st;
-          var right = x.st === 'work' ? (dcols.indexOf('hr') >= 0 ? (x.done ? 'Done ' + String(x.h || '').slice(5) : x.up ? 'In at ' + String(x.h || '').slice(0, 4) : x.h) : (x.up ? 'Later' : x.done ? 'Done' : ''))
-            : x.st === 'rest' ? 'Not working today' : x.st === 'none' ? 'No schedule' : '';
-          var pills = (x.st === 'off' ? '<span class="pill lv">' + esc(dcols.indexOf('why') >= 0 ? x.why || 'Off' : 'Off') + '</span>' : '') +
-            (x.st === 'work' && x.why && dcols.indexOf('why') >= 0 ? '<span class="pill tag">' + esc(x.why) + '</span>' : '') +
-            (x.part && dcols.indexOf('why') >= 0 ? '<span class="pill lv">' + esc(x.part) + '</span>' : '');
-          return '<div class="dw ' + cls + (isNew(bi, ti, dwSig(d, x)) ? ' chg' : '') + '">' +
-            (x.cs && dcols.indexOf('cs') >= 0 ? '<span class="oc-cs">' + esc(x.cs) + '</span>' : '') +
-            '<span class="dw-n">' + esc(x.n) + '</span>' + (x.r && dcols.indexOf('rank') >= 0 ? '<span class="dw-r">' + esc(x.r) + '</span>' : '') + pills +
-            (right ? '<span class="dw-h">' + esc(right) + '</span>' : '') + '</div>';
+      var dwRow = function (d, x) {
+        var cls = x.st === 'work' ? (x.on ? 'on' : x.done ? 'done' : 'up') : x.st;
+        var lab = '', val = '';
+        if (x.st === 'work') {
+          lab = x.on ? 'On now' : x.up ? 'In at' : 'Done';
+          val = dcols.indexOf('hr') >= 0 ? (x.up ? String(x.h || '').slice(0, 4) : x.h || '') : '';
+        } else if (x.st === 'off') { lab = 'Off'; val = dcols.indexOf('why') >= 0 && x.why && x.why !== 'Off' ? x.why : ''; }
+        else if (x.st === 'rest') lab = 'Not today';
+        else if (x.st === 'none') lab = 'No schedule';
+        var tags = (x.st === 'work' && x.why && dcols.indexOf('why') >= 0 ? '<span class="pill tag">' + esc(x.why) + '</span>' : '') +
+          (x.part && dcols.indexOf('why') >= 0 ? '<span class="pill lv">' + esc(x.part) + '</span>' : '');
+        return '<div class="dw2 ' + cls + (isNew(bi, ti, dwSig(d, x)) ? ' chg' : '') + '">' +
+          '<span class="dw2-cs">' + (x.cs && dcols.indexOf('cs') >= 0 ? '<span class="oc-cs">' + esc(x.cs) + '</span>' : '') + '</span>' +
+          '<span class="dw2-n"><b>' + esc(x.n) + '</b>' + (x.r && dcols.indexOf('rank') >= 0 ? '<small>' + esc(x.r) + '</small>' : '') + tags + '</span>' +
+          '<span class="dw2-h"><small>' + esc(lab) + '</small>' + esc(val) + '</span></div>';
+      };
+      var dwExtra = function (x) {
+        var lab = x.on ? 'On now' : x.up ? 'Later' : 'Done';
+        return '<div class="dw2 xt ' + (x.on ? 'on' : x.done ? 'done' : 'up') + '">' +
+          '<span class="dw2-cs">' + (x.cs && dcols.indexOf('cs') >= 0 ? '<span class="oc-cs">' + esc(x.cs) + '</span>' : '') + '</span>' +
+          '<span class="dw2-n"><b>' + esc(x.n) + '</b><small class="dw2-w">' + esc(x.what || 'Overtime') + '</small></span>' +
+          '<span class="dw2-h"><small>' + esc(lab) + '</small>' + esc(x.h || '') + '</span></div>';
+      };
+      inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' : '<div class="dw2-wrap' + (dcols.indexOf('dot') < 0 ? ' no-dot' : '') + '">' + (t.divs || []).map(function (d) {
+        var groups = d.groups || [{ t: '', rows: d.rows }], titled = groups.some(function (g) { return g.t; });
+        var extra = d.extra || [];
+        var head = '<div class="dw2-dh"><span class="dw2-dn">' + esc(d.name) + '</span>' +
+          (dcnt ? '<span class="dw2-dc"><b>' + (d.now || 0) + '</b> in now <i></i> <b>' + d.working + '</b> working today' + (extra.length ? ' <i></i> <b>' + extra.length + '</b> on a detail or OT' : '') + '</span>' : '') + '</div>';
+        var body2 = d.rows.length ? groups.map(function (g) {
+          return (titled ? '<div class="dw2-th">' + esc(g.t || 'Other members') + '<span>' + g.rows.length + '</span></div>' : '') + g.rows.map(function (x) { return dwRow(d, x); }).join('');
         }).join('') : '<p class="empty oc-none">' + (o.only === 'now' ? 'No one in right now' : 'No one working today') + '</p>';
-        return '<div class="dw-div">' + head + rows + '</div>';
+        var ext = extra.length ? '<div class="dw2-th xh">Details &amp; overtime<span>' + extra.length + '</span></div>' + extra.map(dwExtra).join('') : '';
+        return '<div class="dw2-div">' + head + body2 + ext + '</div>';
       }).join('') + '</div>';
     } else if (t.type === 'court') {
       var cdays = t.days || [];
