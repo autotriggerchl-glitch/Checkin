@@ -105,6 +105,10 @@
   .st.late { background: var(--errbg); color: var(--err); } .st.back, .st.pend { background: var(--waitbg); color: var(--wait); }
   .bid.tk.pd { border-left-color: var(--wait); }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tk-all { margin: 4px 0 14px; } .tk-all summary { cursor: pointer; font-weight: 700; color: var(--muted); padding: 8px 2px; }
+  .tk-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 0 0 8px; background: var(--card); border-radius: 10px; box-shadow: 0 1px 0 rgba(20, 40, 75, .12); }
+  .tk-row > div { flex: 1; min-width: 0; } .tk-row b { display: block; } .tk-row small { color: var(--muted); font-size: 14px; }
+  .tk-row .btn { width: auto; min-height: 40px; padding: 0 14px; font-size: 15px; flex: none; }
   select.sel { width: 100%; min-height: 50px; padding: 0 12px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--field); font-size: 16px; color: var(--ink); }
   label.chk { display: flex; gap: 10px; align-items: center; margin: 14px 0 0; font-size: 15px; } label.chk input { width: 22px; height: 22px; min-height: 0; flex: none; }
   textarea { font: inherit; width: 100%; min-height: 90px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--field); color: var(--ink); resize: vertical; }
@@ -205,6 +209,8 @@
     app.querySelectorAll('[data-wd]').forEach(function (b) { b.onclick = function () { withdraw(b.getAttribute('data-wd')); }; });
     app.querySelectorAll('[data-tk]').forEach(function (b) { b.onclick = function () { taskDone(b.getAttribute('data-tk'), 'done'); }; });
     if ($('tk-new')) $('tk-new').onclick = taskNew;
+    var tka = app.querySelector('.tk-all'); if (tka) tka.ontoggle = function () { st.allOpen = tka.open; };
+    app.querySelectorAll('[data-tkdel]').forEach(function (b) { b.onclick = function () { taskDelete(b.getAttribute('data-tkdel')); }; });
     app.querySelectorAll('[data-tkp]').forEach(function (b) { b.onclick = function () { taskDone(b.getAttribute('data-tkp'), 'pending'); }; });
     app.querySelectorAll('[data-tkc]').forEach(function (b) { b.onclick = function () { taskDone(b.getAttribute('data-tkc'), 'clear'); }; });
   }
@@ -215,7 +221,12 @@
     if (!L.length && !make) return '';
     var todo = L.filter(function (t) { return t.st !== 'done'; }).length;
     return '<h2>Tasks <em>' + todo + '</em>' + (make ? '<button type="button" class="link" id="tk-new" style="margin-left:auto">+ New task</button>' : '') + '</h2>' +
-      (L.length ? L.map(taskCard).join('') : '<p class="empty">No tasks for you right now.</p>');
+      (L.length ? L.map(taskCard).join('') : '<p class="empty">No tasks for you right now.</p>') +
+      (make && (make.all || []).length ? '<details class="tk-all"' + (st.allOpen ? ' open' : '') + '><summary>All open tasks (' + make.all.length + ')</summary>' + make.all.map(function (t) {
+        var dd = dayDiff(t.due), late = t.st !== 'done' && dd != null && dd < 0;
+        return '<div class="tk-row"><div><b>' + esc(t.title) + '</b><small>' + esc([t.due ? 'Due ' + md(t.due) + (t.time ? ' by ' + t.time : '') : '', t.forName, t.st === 'done' ? 'done, to confirm' : late ? 'overdue' : '', t.rep].filter(Boolean).join(' · ')) + '</small></div>' +
+          '<button type="button" class="btn danger" data-tkdel="' + esc(t.id) + '">Delete</button></div>';
+      }).join('') + '</details>' : '');
   }
   function taskCard(t) {
     var dd = dayDiff(t.due), late = t.st !== 'done' && dd != null && dd < 0, soon = t.st !== 'done' && dd != null && dd >= 0 && dd <= 2, pd = t.st !== 'done' && t.pend;
@@ -229,8 +240,32 @@
       (t.notes ? '<p class="det">' + esc(t.notes) + '</p>' : '') + status +
       (t.st === 'done' ? '<div style="height:14px"></div>' : '<div class="acts"><button type="button" class="btn" data-tk="' + esc(t.id) + '">Mark done</button>' +
         '<div class="two"><button type="button" class="btn ghost" data-tkp="' + esc(t.id) + '">' + (pd ? 'Update the issue' : 'Mark pending') + '</button>' +
-        (pd ? '<button type="button" class="btn ghost" data-tkc="' + esc(t.id) + '">Not pending</button>' : '<span></span>') + '</div></div>') + '</div>';
+        (pd ? '<button type="button" class="btn ghost" data-tkc="' + esc(t.id) + '">Not pending</button>' : '<span></span>') + '</div>' +
+        (st.data.make ? '<button type="button" class="link" data-tkdel="' + esc(t.id) + '" style="color:var(--err);justify-self:end">Delete this task</button>' : '') + '</div>') + '</div>';
   }
+  // ---------- Delete a task (Admins and anyone with the Tasks right) ----------
+  function taskDelete(id) {
+    var mk = st.data.make || {}, t = (mk.all || []).filter(function (x) { return x.id === id; })[0] || (st.data.tasks || []).filter(function (x) { return x.id === id; })[0];
+    if (!t) return;
+    var ov = $('ov');
+    ov.innerHTML = '<div class="card"><h1>Delete this task?</h1><p class="note"><b>' + esc(t.title) + '</b><br>It comes off the portal and the TV boards' + (t.rep ? ', and it stops repeating' : '') + '. It stays in the task history in the Duty Roster.</p>' +
+      '<div class="btns"><button type="button" class="btn ghost" id="tdx">Keep it</button><button type="button" class="btn danger" id="tdgo">Delete</button></div></div>';
+    ov.hidden = false;
+    $('tdx').onclick = function () { ov.hidden = true; };
+    $('tdgo').onclick = function () {
+      this.disabled = true; this.textContent = 'Deleting…';
+      api('portalTaskDelete', { email: st.email, token: st.token, t: id }).then(function (res) {
+        if (res && res.pin) { ov.hidden = true; signOut(); return; }
+        if (res && res.ok) {
+          st.data.tasks = (st.data.tasks || []).filter(function (x) { return x.id !== id; });
+          if (st.data.make) st.data.make.all = (st.data.make.all || []).filter(function (x) { return x.id !== id; });
+          store.set('portal-home', JSON.stringify(st.data));
+        }
+        ov.hidden = true; render(); toast((res && res.message) || 'That didn\'t go through.', !(res && res.ok));
+      }, function () { ov.hidden = true; toast('Couldn\'t reach the portal. Try again.', true); });
+    };
+  }
+
   // ---------- New task (Admins and anyone with the Tasks right) ----------
   function taskNew() {
     var mk = st.data.make; if (!mk) return;
