@@ -183,7 +183,7 @@
     var d = st.data, me = d.me;
     var open = d.bids.filter(function (b) { return !b.closed; }), done = d.bids.filter(function (b) { return b.closed; });
     var signed = function (c) { return c.seats.length || c.waits.length || (c.rpSeats || []).length || (c.rpWaits || []).length; };
-    var mine = d.classes.filter(signed);
+    var mine = d.classes.filter(function (c) { return signed(c) && !c.cancelled; });   // cancelled ones aren't shown
     var other = d.classes.filter(function (c) { return !signed(c) && !c.cancelled; });
     app.innerHTML =
       '<div class="card"><div class="me"><span class="av">' + esc(initials(me.name)) + '</span><div><b>' + esc(me.name) + '</b><small>' + esc([me.call, d.email].filter(Boolean).join(' · ')) + '</small></div></div>' +
