@@ -303,12 +303,16 @@
           '<button type="button" class="btn danger" data-tkdel="' + esc(t.id) + '">Delete</button></div>';
       }).join('') + '</details>' : '');
   }
+  // My classes: classes I'm signed up for, and trainings I've asked for (or booked) a time in.
+  // Open for sign-up: open classes, and trainings where I can request a time.
   function trainingPane(P) {
-    var html = '';
-    if (P.times.length) html += '<h2>Request a time <em>' + P.times.length + '</em></h2>' + P.times.map(timeCard).join('');
-    html += '<h2>My classes <em>' + P.classesMine.length + '</em></h2>' + (P.classesMine.length ? P.classesMine.map(classCard).join('') : '<p class="empty">You aren\'t signed up for any classes.</p>');
-    html += '<h2 id="c-classes-open">Open for sign-up <em>' + P.classesOpen.length + '</em></h2>' + (P.classesOpen.length ? P.classesOpen.map(classCard).join('') : '<p class="empty">No classes are open for sign-up right now.</p>');
-    return html;
+    var live = function (w) { return w.mine.some(function (m) { return ['sent', 'waiting', 'approved', 'suggested'].indexOf(m.st) >= 0; }); };
+    var timesMine = P.times.filter(live), timesOpen = P.times.filter(function (w) { return !live(w); });
+    var nMine = P.classesMine.length + timesMine.length, nOpen = P.classesOpen.length + timesOpen.length;
+    return '<h2>My classes <em>' + nMine + '</em></h2>' +
+        (nMine ? timesMine.map(timeCard).join('') + P.classesMine.map(classCard).join('') : '<p class="empty">You aren\'t signed up for anything yet.</p>') +
+      '<h2 id="c-classes-open">Open for sign-up <em>' + nOpen + '</em></h2>' +
+        (nOpen ? timesOpen.map(timeCard).join('') + P.classesOpen.map(classCard).join('') : '<p class="empty">Nothing is open for sign-up right now.</p>');
   }
   function bidsPane(P) {
     return '<h2>Open shift bids <em>' + P.bidsOpen.length + '</em></h2>' + (P.bidsOpen.length ? P.bidsOpen.map(bidCard).join('') : '<p class="empty">No shift bids are open right now.</p>') +
