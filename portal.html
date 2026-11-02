@@ -105,6 +105,11 @@
   .st.late { background: var(--errbg); color: var(--err); } .st.back, .st.pend { background: var(--waitbg); color: var(--wait); }
   .bid.tk.pd { border-left-color: var(--wait); }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin-top: 6px; }
+  .slot { min-height: 54px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--card); font: inherit; font-size: 17px; font-weight: 800; color: var(--ink); cursor: pointer; }
+  .slot small { display: block; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .slot.on { border-color: var(--navy, #1C3159); background: var(--navy, #1C3159); color: #fff; } .slot.on small { color: #dfe6f3; }
+  .slot:disabled { opacity: .45; cursor: default; }
   .tk-all { margin: 4px 0 14px; } .tk-all summary { cursor: pointer; font-weight: 700; color: var(--muted); padding: 8px 2px; }
   .tk-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 0 0 8px; background: var(--card); border-radius: 10px; box-shadow: 0 1px 0 rgba(20, 40, 75, .12); }
   .tk-row > div { flex: 1; min-width: 0; } .tk-row b { display: block; } .tk-row small { color: var(--muted); font-size: 14px; }
@@ -195,6 +200,7 @@
       '<div class="card"><div class="me"><span class="av">' + esc(initials(me.name)) + '</span><div><b>' + esc(me.name) + '</b><small>' + esc([me.call, d.email].filter(Boolean).join(' · ')) + '</small></div></div>' +
         '<div class="row2"><button type="button" class="link" id="chpin">Change PIN</button><button type="button" class="link" id="out">Sign out</button></div></div>' +
       tasksHtml(d.tasks || [], d.make) +
+      timesHtml(d.times || []) +
       '<h2>Shift bids <em>' + open.length + '</em></h2>' +
       (open.length ? open.map(bidCard).join('') : '<p class="empty">No shift bids are open right now.</p>') +
       (done.length ? done.map(bidCard).join('') : '') +
@@ -213,6 +219,118 @@
     app.querySelectorAll('[data-tkdel]').forEach(function (b) { b.onclick = function () { taskDelete(b.getAttribute('data-tkdel')); }; });
     app.querySelectorAll('[data-tkp]').forEach(function (b) { b.onclick = function () { taskDone(b.getAttribute('data-tkp'), 'pending'); }; });
     app.querySelectorAll('[data-tkc]').forEach(function (b) { b.onclick = function () { taskDone(b.getAttribute('data-tkc'), 'clear'); }; });
+    app.querySelectorAll('[data-treq]').forEach(function (b) { b.onclick = function () { timeRequest(b.getAttribute('data-treq')); }; });
+    app.querySelectorAll('[data-tacc]').forEach(function (b) { b.onclick = function () { timeAct(b.getAttribute('data-tacc'), 'accept'); }; });
+    app.querySelectorAll('[data-tcx]').forEach(function (b) { b.onclick = function () { timeAct(b.getAttribute('data-tcx'), 'cancel'); }; });
+  }
+
+  // ---------- Request a time (trainings over a date range, like pistol quals) ----------
+  var TSTATE = { sent: 'Sent: waiting for the Duty Roster to bring it in', waiting: 'Waiting for an instructor to approve it', approved: 'Approved', suggested: 'The instructor suggested another time',
+    declined: 'Not approved', cancelled: 'Cancelled' };
+  function timesHtml(L) {
+    if (!L.length) return '';
+    return '<h2>Training times <em>' + L.length + '</em></h2>' + L.map(timeCard).join('');
+  }
+  function timeCard(w) {
+    var live = w.mine.filter(function (m) { return ['sent', 'waiting', 'approved', 'suggested'].indexOf(m.st) >= 0; })[0];
+    var last = !live ? w.mine[0] : null;
+    var status = '';
+    if (live) {
+      var cls = live.st === 'approved' ? 'in' : live.st === 'suggested' ? 'pend' : 'none';
+      status = '<div class="st ' + cls + '"><b>' + (live.st === 'approved' ? '✓ ' : '') + esc(TSTATE[live.st]) + '</b><br>' +
+        (live.st === 'suggested' && live.alt ? 'Suggested: <b>' + esc(md(live.alt.d) + ' at ' + live.alt.t) + '</b> (you asked for ' + esc(md(live.d) + ' ' + live.t) + ')'
+          : esc(md(live.d) + ' at ' + live.t)) +
+        (live.reply ? '<br><i>' + esc(live.reply) + '</i>' : '') + '</div>';
+    } else if (last && (last.st === 'declined' || last.st === 'cancelled')) {
+      status = '<div class="st back"><b>' + esc(TSTATE[last.st]) + ':</b> ' + esc(md(last.d) + ' ' + last.t) + (last.reply ? '<br>' + esc(last.reply) : '') + '</div>';
+    }
+    var acts = '';
+    if (live && live.st === 'suggested') acts = '<button type="button" class="btn" data-tacc="' + esc(w.id + '|' + live.id) + '">Accept ' + esc(md(live.alt.d) + ' ' + live.alt.t) + '</button>' +
+      '<button type="button" class="btn ghost" data-tcx="' + esc(w.id + '|' + live.id) + '">No, cancel my request</button>';
+    else if (live) acts = '<button type="button" class="btn ghost" data-tcx="' + esc(w.id + '|' + live.id) + '">' + (live.st === 'approved' ? 'Cancel my time' : 'Cancel my request') + '</button>';
+    else if (w.open) acts = '<button type="button" class="btn" data-treq="' + esc(w.id) + '">Request a time</button>';
+    return '<div class="bid"><div class="hd"><b>' + esc(w.title) + '</b><small>' + esc(md(w.from) + ' to ' + md(w.to) + (w.loc ? ' · ' + w.loc : '')) + '</small></div>' +
+      (w.notes ? '<p class="det">' + esc(w.notes) + '</p>' : '') +
+      (w.hours.length && w.mode !== 'any' ? '<p class="det" style="margin-top:0">Open: ' + w.hours.map(esc).join(' · ') + '</p>' : '') +
+      status + (acts ? '<div class="acts">' + acts + '</div>' : '<div style="height:14px"></div>') + '</div>';
+  }
+  function timeFind(id) { return ((st.data && st.data.times) || []).filter(function (w) { return w.id === id; })[0]; }
+  function timeSend(arg, done) {
+    api('portalTime', Object.assign({ email: st.email, token: st.token }, arg)).then(function (res) {
+      if (res && res.pin) { $('ov').hidden = true; signOut(); return; }
+      if (res && res.time) st.data.times = st.data.times.map(function (x) { return x.id === res.time.id ? res.time : x; });
+      if (res && res.gone) st.data.times = st.data.times.filter(function (x) { return x.id !== arg.w; });
+      store.set('portal-home', JSON.stringify(st.data));
+      done(res);
+    }, function () { done({ ok: false, message: 'Couldn\'t reach the portal. Try again.' }); });
+  }
+  function timeRequest(id) {
+    var w = timeFind(id); if (!w) return;
+    var ov = $('ov'), days = [];
+    w.slots.forEach(function (s) { if (days.indexOf(s.d) < 0) days.push(s.d); });
+    var today = st.data.today || '';
+    var min = w.from > today ? w.from : today;
+    var tq = { d: '', t: '', other: w.mode === 'any' };
+    var draw = function () {
+      var list = w.slots.filter(function (s) { return s.d === tq.d; });
+      ov.innerHTML = '<div class="card"><h1>Request a time</h1><p class="note"><b>' + esc(w.title) + '</b><br>' +
+          (w.mode === 'any' ? 'Pick any day and time from ' + esc(md(w.from)) + ' to ' + esc(md(w.to)) + '.' : 'Pick a day, then one of the open times.' + (w.mode === 'both' ? ' If none work, you can ask for another time.' : '')) +
+          ' An instructor approves it, and you get an email.</p>' +
+        (w.mode === 'any' ? '<label class="field"><span>Day</span><input type="date" id="tr-d" min="' + esc(min) + '" max="' + esc(w.to) + '" value="' + esc(tq.d) + '"></label>'
+          : '<label class="field"><span>Day</span><select id="tr-d" class="sel"><option value="">Pick a day</option>' + days.map(function (d) {
+              var free = w.slots.filter(function (s) { return s.d === d && s.left > 0; }).length;
+              return '<option value="' + esc(d) + '"' + (tq.d === d ? ' selected' : '') + (free || w.mode === 'both' ? '' : ' disabled') + '>' + esc(md(d)) + (free ? '' : ' (full)') + '</option>';
+            }).join('') + '</select></label>') +
+        (tq.d && w.mode !== 'any' ? '<div class="field"><span>Time</span><div class="slots">' + list.map(function (s) {
+            return '<button type="button" class="slot' + (tq.t === s.t && !tq.other ? ' on' : '') + '" data-slot="' + s.t + '"' + (s.left > 0 ? '' : ' disabled') + '>' + esc(s.t) + '<small>' + (s.left > 0 ? s.left + ' left' : 'Full') + '</small></button>';
+          }).join('') + (w.mode === 'both' ? '<button type="button" class="slot' + (tq.other ? ' on' : '') + '" data-slot="other">Other<small>ask for a time</small></button>' : '') + '</div></div>' : '') +
+        (tq.other && (tq.d || w.mode === 'any') ? (w.mode === 'both' ? '<label class="field"><span>Day</span><input type="date" id="tr-d2" min="' + esc(min) + '" max="' + esc(w.to) + '" value="' + esc(tq.d) + '"></label>' : '') +
+          '<label class="field"><span>Time</span><input type="time" id="tr-t" value="' + (tq.t && tq.other ? tq.t.slice(0, 2) + ':' + tq.t.slice(2) : '') + '"></label>' : '') +
+        '<label class="field"><span>Note for the instructor (optional)</span><input type="text" id="tr-n" maxlength="300" autocomplete="off" value="' + esc(tq.note || '') + '"></label>' +
+        '<p class="err" id="tr-err"></p>' +
+        '<div class="btns"><button type="button" class="btn ghost" id="trx">Cancel</button><button type="button" class="btn" id="trgo">Send request</button></div></div>';
+      ov.hidden = false;
+      var keep = function () { tq.note = $('tr-n').value; if ($('tr-t')) tq.t = $('tr-t').value.replace(/\D/g, ''); if ($('tr-d2')) tq.d = $('tr-d2').value; };
+      $('tr-d').onchange = function () { keep(); tq.d = this.value; if (!tq.other) tq.t = ''; draw(); };
+      if ($('tr-d2')) $('tr-d2').onchange = function () { keep(); };
+      ov.querySelectorAll('[data-slot]').forEach(function (b) { b.onclick = function () {
+        keep(); var v = b.getAttribute('data-slot');
+        if (v === 'other') { tq.other = true; tq.t = ''; } else { tq.other = false; tq.t = v; }
+        draw();
+      }; });
+      $('trx').onclick = function () { ov.hidden = true; };
+      $('trgo').onclick = function () {
+        keep();
+        if (!tq.d) { $('tr-err').textContent = 'Pick a day.'; return; }
+        if (!/^\d{4}$/.test(tq.t)) { $('tr-err').textContent = 'Pick a time.'; return; }
+        var b = this; b.disabled = true; b.textContent = 'Sending…';
+        timeSend({ w: w.id, op: 'req', d: tq.d, t: tq.t, note: tq.note || '' }, function (res) {
+          if (!res || !res.ok) { b.disabled = false; b.textContent = 'Send request'; $('tr-err').textContent = (res && res.message) || 'That didn\'t go through.'; return; }
+          ov.hidden = true; render(); toast(res.message);
+          setTimeout(function () { loadHome(true); }, 150000);
+        });
+      };
+    };
+    draw();
+  }
+  function timeAct(v, op) {
+    var p = v.split('|'), w = timeFind(p[0]); if (!w) return;
+    var m = w.mine.filter(function (x) { return x.id === p[1]; })[0]; if (!m) return;
+    var ov = $('ov');
+    var head = op === 'accept' ? 'Accept ' + md(m.alt.d) + ' at ' + m.alt.t + '?' : m.st === 'approved' ? 'Cancel your time?' : 'Cancel your request?';
+    ov.innerHTML = '<div class="card"><h1>' + esc(head) + '</h1><p class="note"><b>' + esc(w.title) + '</b><br>' +
+        (op === 'accept' ? 'You\'re booked for that time.' : 'The instructors are told. You can request another time after.') + '</p>' +
+      '<p class="err" id="ta-err"></p><div class="btns"><button type="button" class="btn ghost" id="tax">Back</button><button type="button" class="btn' + (op === 'accept' ? '' : ' danger') + '" id="tago">' +
+        (op === 'accept' ? 'Accept' : 'Cancel it') + '</button></div></div>';
+    ov.hidden = false;
+    $('tax').onclick = function () { ov.hidden = true; };
+    $('tago').onclick = function () {
+      var b = this; b.disabled = true; b.textContent = 'Sending…';
+      timeSend({ w: w.id, op: op, rid: m.id }, function (res) {
+        if (!res || !res.ok) { b.disabled = false; b.textContent = op === 'accept' ? 'Accept' : 'Cancel it'; $('ta-err').textContent = (res && res.message) || 'That didn\'t go through.'; return; }
+        ov.hidden = true; render(); toast(res.message);
+      });
+    };
   }
 
   // ---------- Tasks: the ones for your division, role or you ----------
