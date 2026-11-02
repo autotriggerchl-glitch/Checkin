@@ -225,8 +225,11 @@
   }
 
   // ---------- Request a time (trainings over a date range, like pistol quals) ----------
-  var TSTATE = { sent: 'Sent: waiting for the Duty Roster to bring it in', waiting: 'Waiting for an instructor to approve it', approved: 'Approved', suggested: 'The instructor suggested another time',
-    declined: 'Not approved', cancelled: 'Cancelled' };
+  // A function (not a var), so it already works when the page first draws from its saved copy.
+  function tState(k) {
+    return { sent: 'Sent: waiting for the Duty Roster to bring it in', waiting: 'Waiting for an instructor to approve it', approved: 'Approved', suggested: 'The instructor suggested another time',
+      declined: 'Not approved', cancelled: 'Cancelled' }[k] || k;
+  }
   function timesHtml(L) {
     if (!L.length) return '';
     return '<h2>Training times <em>' + L.length + '</em></h2>' + L.map(timeCard).join('');
@@ -237,12 +240,12 @@
     var status = '';
     if (live) {
       var cls = live.st === 'approved' ? 'in' : live.st === 'suggested' ? 'pend' : 'none';
-      status = '<div class="st ' + cls + '"><b>' + (live.st === 'approved' ? '✓ ' : '') + esc(TSTATE[live.st]) + '</b><br>' +
+      status = '<div class="st ' + cls + '"><b>' + (live.st === 'approved' ? '✓ ' : '') + esc(tState(live.st)) + '</b><br>' +
         (live.st === 'suggested' && live.alt ? 'Suggested: <b>' + esc(md(live.alt.d) + ' at ' + live.alt.t) + '</b> (you asked for ' + esc(md(live.d) + ' ' + live.t) + ')'
           : esc(md(live.d) + ' at ' + live.t)) +
         (live.reply ? '<br><i>' + esc(live.reply) + '</i>' : '') + '</div>';
     } else if (last && (last.st === 'declined' || last.st === 'cancelled')) {
-      status = '<div class="st back"><b>' + esc(TSTATE[last.st]) + ':</b> ' + esc(md(last.d) + ' ' + last.t) + (last.reply ? '<br>' + esc(last.reply) : '') + '</div>';
+      status = '<div class="st back"><b>' + esc(tState(last.st)) + ':</b> ' + esc(md(last.d) + ' ' + last.t) + (last.reply ? '<br>' + esc(last.reply) : '') + '</div>';
     }
     var acts = '';
     if (live && live.st === 'suggested') acts = '<button type="button" class="btn" data-tacc="' + esc(w.id + '|' + live.id) + '">Accept ' + esc(md(live.alt.d) + ' ' + live.alt.t) + '</button>' +
