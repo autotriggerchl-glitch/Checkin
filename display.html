@@ -52,6 +52,9 @@
   .bx.bad { border-left-color: var(--err); } .bx.bad .v { color: var(--err); }
   .bx.mid { border-left-color: var(--warn); } .bx.mid .v { color: var(--warn); }
   .bx.det { border-left-color: #9C7A22; } .bx.det .v { color: #9C7A22; }
+  .bx.ocw { border-left-color: var(--navy, #1C3159); grid-column: span 2; }
+  .t-blues .bx.ocw { border-top-color: #1C3159; }
+  .bx.ocw .v { font-size: 1.9em; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Body grid */
   .body { position: relative; padding: .8em; display: grid; gap: .8em; min-height: 0; }
   .l-one { grid-template: minmax(0, 1fr) / 1fr; }
@@ -517,7 +520,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-10-29a';
+  var PAGE_VERSION = '2026-11-02a';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -638,7 +641,7 @@ var LOCK = (function () {
         '<div class="right"><button type="button" class="rl" id="rl" aria-label="Reload">↻</button><div class="clock" id="clk">' + hm(now) + '</div><div class="date">' + esc(longDate(now)) + '</div>' +
           '<div class="wx" id="wx">' + wxText() + '</div></div></div>' +
       '<div>' + shortHtml(b.short) + '<div id="wxa">' + wxAlertHtml() + '</div></div>' +
-      (b.banner ? bannerHtml(b.banner, list({ s: b.bshow }, 's', ['pat', 'sup', 'staff', 'off', 'cars', 'det', 'ov'])) : '<div></div>') +
+      (b.banner ? bannerHtml(b.banner, list({ s: b.bshow }, 's', ['pat', 'sup', 'staff', 'off', 'cars', 'det', 'ov', 'oc'])) : '<div></div>') +
       '<div class="body l-' + layout + '">' + b.tiles.map(function (t, ti) { return tileHtml(t, bi, ti); }).join('') + '</div>' +
       (b.ticker && msgs.length ? '<div class="tick"><span id="tick">' + msgs.map(esc).join('   •   ') + '</span></div>' : '<div></div>') +
       '</div>';
@@ -676,7 +679,7 @@ var LOCK = (function () {
 
   // "Right now" numbers across the top.
   function bannerHtml(n, show) {
-    show = show || ['pat', 'sup', 'staff', 'off', 'cars', 'det', 'ov'];
+    show = show || ['pat', 'sup', 'staff', 'off', 'cars', 'det', 'ov', 'oc'];
     var on = function (k) { return show.indexOf(k) >= 0; };
     if (!show.length) return '<div></div>';
     var shift = SHIFT_NAMES[n.shift] || '';
@@ -691,6 +694,9 @@ var LOCK = (function () {
       (on('cars') ? box(n.carsOut ? 'bad' : 'good', 'Cruisers down', n.carsOut, n.carsOut ? 'Out of service' : 'All in service') : '') +
       (on('det') && n.det ? box(n.det.length ? 'det' : '', 'On a detail', n.det.length, n.det.length ? 'Cruiser ' + n.det.join(', ') : 'None now') : '') +
       (n.overlaps == null || !on('ov') ? '' : box(n.overlaps ? 'bad' : 'good', 'Overlaps', n.overlaps, n.overlaps ? 'Waiting for review' : 'None waiting')) +
+      (on('oc') && n.oncall ? '<div class="bx ocw"><div class="k">' + esc(n.oncall.title + ' this week') + '</div>' +
+        '<div class="v">' + esc(n.oncall.n) + (n.oncall.c ? '<small>' + esc(n.oncall.c) + '</small>' : '') + '</div>' +
+        '<div class="s">' + esc(n.oncall.next ? 'Next: ' + n.oncall.next.n + (n.oncall.next.c ? ' (' + n.oncall.next.c + ')' : '') + ' · ' + n.oncall.next.from : 'Until ' + n.oncall.until) + '</div></div>' : '') +
       '</div>';
   }
 
