@@ -149,6 +149,12 @@
   .bid, a.cls, h2 { scroll-margin-top: 64px; }
   .bid.flash { box-shadow: 0 0 0 3px var(--focus); transition: box-shadow .3s; }
   .menu { display: grid; gap: 8px; margin: 14px 0 0; }
+  .h2-note { font: 600 13px "Source Sans 3", sans-serif; color: var(--muted); margin-left: auto; }
+  .bid.rd { border-left-color: var(--navy); } .rd-list { padding: 4px 14px 0; }
+  .rd-day { margin: 10px 0 2px; font-size: 12.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+  .rd-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); } .rd-day + .rd-row { border-top: 0; }
+  .rd-row > div { flex: 1; min-width: 0; } .rd-row b { display: block; font-size: 16px; } .rd-row small { color: var(--muted); font-size: 14px; }
+  input[type=time], input[type=number] { width: 100%; min-height: 50px; padding: 0 12px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--field); font-size: 17px; color: var(--ink); }
 </style>
 </head>
 <body>
@@ -255,6 +261,7 @@
       else if (!t.pend) add(6, '', 'Task: ' + t.title, t.due ? 'Due ' + md(t.due) : '', 'tasks', 'tk-' + t.id);
     });
     P.times.forEach(function (w) {
+      if (w.inst && !(w.blocks || []).length) { add(3, 'warn', 'Post range days: ' + w.title, 'No instructor days yet, so officers can\'t pick a time', 'training', 'rd-' + w.id); P.trainNeeds++; }
       var live = w.mine.filter(function (m) { return ['sent', 'waiting', 'approved', 'suggested'].indexOf(m.st) >= 0; })[0];
       if (live && live.st === 'suggested' && live.alt) { add(1, 'warn', 'New time suggested: ' + w.title, 'Accept ' + md(live.alt.d) + ' at ' + live.alt.t + (live.alt.inst ? ' with ' + live.alt.inst : '') + ', or cancel', 'training', 'tm-' + w.id); P.trainNeeds++; }
       else if (live && live.st === 'approved') P.soon.push({ at: live.d + live.t, text: w.title, sub: md(live.d) + ' at ' + live.t + (live.inst ? ' with ' + live.inst : '') + (w.loc ? ' · ' + w.loc : ''), tab: 'training', id: 'tm-' + w.id });
@@ -307,9 +314,11 @@
   // Open for sign-up: open classes, and trainings where I can request a time.
   function trainingPane(P) {
     var live = function (w) { return w.mine.some(function (m) { return ['sent', 'waiting', 'approved', 'suggested'].indexOf(m.st) >= 0; }); };
-    var timesMine = P.times.filter(live), timesOpen = P.times.filter(function (w) { return !live(w); });
+    var timesMine = P.times.filter(live), timesOpen = P.times.filter(function (w) { return !live(w) && w.open; });
     var nMine = P.classesMine.length + timesMine.length, nOpen = P.classesOpen.length + timesOpen.length;
-    return '<h2>My classes <em>' + nMine + '</em></h2>' +
+    var teach = P.times.filter(function (w) { return w.inst; });
+    return (teach.length ? '<h2>Range days <em>' + teach.length + '</em><small class="h2-note">for instructors</small></h2>' + teach.map(rangeCard).join('') : '') +
+      '<h2>My classes <em>' + nMine + '</em></h2>' +
         (nMine ? timesMine.map(timeCard).join('') + P.classesMine.map(classCard).join('') : '<p class="empty">You aren\'t signed up for anything yet.</p>') +
       '<h2 id="c-classes-open">Open for sign-up <em>' + nOpen + '</em></h2>' +
         (nOpen ? timesOpen.map(timeCard).join('') + P.classesOpen.map(classCard).join('') : '<p class="empty">Nothing is open for sign-up right now.</p>');
@@ -343,6 +352,8 @@
     app.querySelectorAll('[data-treq]').forEach(function (b) { b.onclick = function () { timeRequest(b.getAttribute('data-treq')); }; });
     app.querySelectorAll('[data-tacc]').forEach(function (b) { b.onclick = function () { timeAct(b.getAttribute('data-tacc'), 'accept'); }; });
     app.querySelectorAll('[data-tcx]').forEach(function (b) { b.onclick = function () { timeAct(b.getAttribute('data-tcx'), 'cancel'); }; });
+    app.querySelectorAll('[data-rdn]').forEach(function (b) { b.onclick = function () { rangeDay(b.getAttribute('data-rdn'), ''); }; });
+    app.querySelectorAll('[data-rde]').forEach(function (b) { b.onclick = function () { var v = b.getAttribute('data-rde').split('|'); rangeDay(v[0], v[1]); }; });
   }
   function openAccount() {
     var ov = $('ov'), d = st.data;
@@ -471,6 +482,55 @@
         ov.hidden = true; render(); toast(res.message);
       });
     };
+  }
+
+  // ---------- Range days (firearms instructors): who is at the range when ----------
+  function rangeCard(w) {
+    var day = '', rows = (w.blocks || []).map(function (b) {
+      var head = b.d !== day ? '<div class="rd-day">' + esc(md(b.d)) + '</div>' : '';
+      day = b.d;
+      return head + '<div class="rd-row"><div><b>' + esc(b.start + '–' + b.end) + ' · ' + esc(b.who || 'Instructor') + '</b><small>' +
+        esc(b.per + (b.per === 1 ? ' shooter' : ' shooters') + ' at a time' + (b.booked ? ' · ' + b.booked + ' booked' : '') + (b.sending ? ' · saving…' : '')) + '</small></div>' +
+        '<button type="button" class="link" data-rde="' + esc(w.id + '|' + b.id) + '">Change</button></div>';
+    }).join('');
+    return '<div class="bid rd open" id="c-rd-' + esc(w.id) + '"><div class="hd"><b>' + esc(w.title) + '</b><small>' + esc(md(w.from) + ' to ' + md(w.to) + ' · one instructor at a time') + '</small></div>' +
+      '<div class="rd-list">' + (rows || '<p class="empty" style="padding:8px 0">No range days yet. Officers can\'t pick an open time until one is added.</p>') + '</div>' +
+      '<div class="acts"><button type="button" class="btn" data-rdn="' + esc(w.id) + '">+ Add a range day</button></div></div>';
+  }
+  function rangeDay(wid, bid) {
+    var w = timeFind(wid); if (!w) return;
+    var b = bid ? (w.blocks || []).filter(function (x) { return x.id === bid; })[0] : null;
+    var hm = function (t) { t = String(t || ''); return /^\d{4}$/.test(t) ? t.slice(0, 2) + ':' + t.slice(2) : ''; };
+    var today = st.data.today || '', min = w.from > today ? w.from : today;
+    var ov = $('ov');
+    ov.innerHTML = '<div class="card"><h1>' + (b ? 'Change range day' : 'Add a range day') + '</h1><p class="note"><b>' + esc(w.title) + '</b><br>Officers pick ' + (w.slot || 60) + '-minute times from start to end, and see who is on.</p>' +
+      '<label class="field"><span>Instructor</span><select id="rd-k" class="sel">' + (w.instList || []).map(function (x) {
+        return '<option value="' + esc(x.k) + '"' + ((b ? b.k === x.k : w.me === x.k) ? ' selected' : '') + '>' + esc(x.n) + '</option>'; }).join('') + '</select></label>' +
+      '<label class="field"><span>Day</span><input type="date" id="rd-d" min="' + esc(min) + '" max="' + esc(w.to) + '" value="' + esc(b ? b.d : '') + '"></label>' +
+      '<div class="two"><label class="field"><span>From</span><input type="time" id="rd-s" value="' + hm(b ? b.start : '0800') + '"></label>' +
+        '<label class="field"><span>To</span><input type="time" id="rd-e" value="' + hm(b ? b.end : '1200') + '"></label></div>' +
+      '<label class="field"><span>Shooters at a time</span><input type="number" id="rd-p" min="1" max="50" value="' + esc(b ? b.per : 4) + '"></label>' +
+      (b && b.booked ? '<p class="note" style="margin-top:10px">' + b.booked + ' booked on this day. If their time goes away, they\'re flagged for a new time.</p>' : '') +
+      '<p class="err" id="rd-err"></p>' +
+      '<div class="btns"><button type="button" class="btn ghost" id="rdx">Cancel</button><button type="button" class="btn" id="rdgo">Save</button></div>' +
+      (b ? '<div class="row2"><span></span><button type="button" class="link" id="rddel" style="color:var(--err)">Remove this day</button></div>' : '') + '</div>';
+    ov.hidden = false;
+    $('rdx').onclick = function () { ov.hidden = true; };
+    var send = function (arg, btn, label) {
+      btn.disabled = true; btn.textContent = 'Saving…';
+      timeSend(Object.assign({ w: w.id, op: 'block' }, arg), function (res) {
+        if (!res || !res.ok) { btn.disabled = false; btn.textContent = label; $('rd-err').textContent = (res && res.message) || 'That didn\'t go through.'; return; }
+        ov.hidden = true; render(); toast(res.message);
+        setTimeout(function () { loadHome(true); }, 90000);
+      });
+    };
+    $('rdgo').onclick = function () {
+      var d = $('rd-d').value, s0 = $('rd-s').value.replace(/\D/g, ''), e0 = $('rd-e').value.replace(/\D/g, '');
+      if (!d) { $('rd-err').textContent = 'Pick the day.'; return; }
+      if (!/^\d{4}$/.test(s0) || !/^\d{4}$/.test(e0)) { $('rd-err').textContent = 'Pick the start and end.'; return; }
+      send({ id: b ? b.id : '', k: $('rd-k').value, d: d, start: s0, end: e0, per: +$('rd-p').value || 1 }, this, 'Save');
+    };
+    if ($('rddel')) $('rddel').onclick = function () { send({ id: b.id, remove: true }, this, 'Remove this day'); };
   }
 
   // ---------- Tasks: the ones for your division, role or you ----------
