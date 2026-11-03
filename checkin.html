@@ -31,9 +31,13 @@
   h2 i { font-style: normal; color: var(--navy); }
 
   .find { position: relative; }
-  input[type=text] {
+  input[type=text], input[type=email], input[type=password] {
     width: 100%; min-height: 50px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; font-size: 17px;
   }
+  .pinf { display: block; margin: 14px 0 0; }
+  .pinf span { display: block; font-weight: 700; margin: 0 0 6px; font-size: 15px; }
+  .pinf input[type=password] { letter-spacing: 6px; font-size: 22px; }
+  input[type=email]:focus, input[type=password]:focus,
   input[type=text]:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px rgba(47, 93, 168, .18); }
   .drop {
     position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5; margin: 0; padding: 4px; list-style: none;
@@ -301,6 +305,15 @@ function start() {
     st.person = PEOPLE.filter(function (p) { return p.name === already.name; })[0] || null;
     already = null;
   }
+  // Signed in with their PIN: it's them (by call sign, else name). No one else can be picked.
+  if (QUAL && DATA.me) {
+    var meC = String(DATA.me.call || '').toUpperCase();
+    st.person = PEOPLE.filter(function (p) { return meC ? String(p.call).toUpperCase() === meC : p.name === DATA.me.name; })[0] || null;
+    if (!st.person) {
+      stop('Not on this session', esc(DATA.me.name) + ' isn\'t on this qualification\'s list. See the instructor.', true);
+      return;
+    }
+  }
   if (already && already.name) {
     stop('This phone already signed in', esc(already.name) + ' signed in to this training at ' + esc(already.at) +
       '.<br><br>Each phone signs in one person. Ask the supervisor to add anyone else.', true);
@@ -399,7 +412,7 @@ function start() {
     if (st.person) {
       var p = st.person;
       box.innerHTML = '<div class="picked"><div><b>' + esc(p.name) + '</b><small>' + esc([p.rank, p.call].filter(Boolean).join(' · ')) + '</small></div>' +
-        '<button type="button" class="link" id="change">Change</button></div>';
+        (QUAL && DATA.me ? '' : '<button type="button" class="link" id="change">Change</button>') + '</div>';
       return;
     }
     if (st.guest) {
@@ -767,6 +780,54 @@ function start() {
 })();
 }
 
+// A qualification: the officer's portal email and PIN before anything shows.
+function askPin(d, t, k) {
+  var el = function (id) { return document.getElementById(id); };
+  var app = el('app');
+  if (el('dept')) el('dept').textContent = d.dept || '';
+  var img = el('patch');
+  if (img && d.patch) { img.src = d.patch; img.hidden = false; img.onerror = function () { img.hidden = true; }; }
+  var label = document.querySelector('.top span');
+  if (label) label.textContent = 'Firearms qualification';
+  var saved = '';
+  try { saved = localStorage.getItem('ci-email') || ''; } catch (e) {}
+  var esc2 = function (s) { return String(s || '').replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  app.innerHTML = '<div class="card"><h1 class="title">Firearms qualification</h1>' +
+      '<p class="meta">Sign in with the email and PIN you use on the officer portal.</p>' +
+      '<label class="pinf"><span>Email</span><input type="email" id="pe" autocomplete="email" autocapitalize="none" spellcheck="false" value="' + esc2(saved) + '"></label>' +
+      '<label class="pinf"><span>PIN</span><input type="password" id="pp" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"></label>' +
+      '<button type="button" class="go" id="pgo" style="margin-top:16px">Continue</button>' +
+      '<p class="err" id="perr" role="alert"></p>' +
+      '<p class="note">No PIN yet, or forgot it? Use the officer portal, or ask the instructor to enter your score.</p></div>';
+  var btn = el('pgo'), err = el('perr'), busy = false;
+  (saved ? el('pp') : el('pe')).focus();
+  var send = function () {
+    if (busy) return;
+    var e = el('pe').value.trim(), p = el('pp').value.trim();
+    if (!e) { err.textContent = 'Enter your email.'; el('pe').focus(); return; }
+    if (!/^\d{4}$/.test(p)) { err.textContent = 'Enter your 4-digit PIN.'; el('pp').focus(); return; }
+    busy = true; btn.disabled = true; btn.textContent = 'Checking…'; err.textContent = '';
+    var done = function (m) { busy = false; btn.disabled = false; btn.textContent = 'Continue'; if (m) { err.textContent = m; el('pp').value = ''; el('pp').focus(); } };
+    api('checkinPin', { t: t, k: k, email: e, pin: p }).then(function (res) {
+      if (!res || !res.ok) { done((res && res.message) || 'That didn\'t work. Try again.'); return; }
+      try { localStorage.setItem('ci-email', e); } catch (x) {}
+      var show = function (r) { DATA = r; if (!DATA.dept) DATA.dept = d.dept; if (!DATA.patch) DATA.patch = d.patch; start(); };
+      if (!res.box) { show(res); return; }
+      LOCK.open(res.box).then(function (inner) {
+        res.training = inner.training || {};
+        res.people = inner.people || [];
+        if (inner.roles) res.roles = inner.roles;
+        res.qual = inner.qual || null;
+        if (inner.certify) res.certify = inner.certify;
+        show(res);
+      }, function () { done("This QR code doesn't match this training. Scan the code on the instructor's screen again."); });
+    }, function () { done("It didn't go through. Check your signal and try again."); });
+  };
+  btn.addEventListener('click', send);
+  el('pp').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); send(); } });
+  el('pe').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); el('pp').focus(); } });
+}
+
 (function () {
   var q = new URLSearchParams(location.search);
   var fallback = { ok: false, dept: 'Chelsea Police Department', patch: 'https://i.imgur.com/Yu7RJhS.png' };
@@ -784,6 +845,7 @@ function start() {
   api('checkinPage', { t: q.get('t'), k: q.get('k') }).then(function (d) {
     clearTimeout(slow);
     if (!d || !d.ok) { go(d); return; }
+    if (d.pin) { askPin(d, q.get('t'), q.get('k')); return; }
     if (!d.box) { fallback.message = "Sign-in is being updated. Ask the supervisor to close and reopen check-in."; go(fallback); return; }
     return LOCK.open(d.box).then(function (inner) {
       d.training = inner.training || {};
