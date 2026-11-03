@@ -520,7 +520,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-11-02a';
+  var PAGE_VERSION = '2026-11-03a';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -531,6 +531,16 @@ var LOCK = (function () {
   var SHIFT_NAMES = { dayWatch: 'Day Watch', firstHalf: 'First Half', lastHalf: 'Last Half' };
 
   var st = { data: null, v: '', board: 0, boardAt: 0, lastOk: 0, prev: {}, changed: {}, wx: null, wxAlerts: [] };
+  // This TV's own device code, made once and kept in its browser. An admin
+  // approves the device before the link shows anything on it.
+  var DEV = store.get('oid-dev') || '';
+  if (!/^[0-9a-f]{32}$/.test(DEV)) {
+    var rb = new Uint8Array(16);
+    try { crypto.getRandomValues(rb); } catch (e) { for (var ri = 0; ri < 16; ri++) rb[ri] = Math.floor(Math.random() * 256); }
+    DEV = Array.prototype.map.call(rb, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    store.set('oid-dev', DEV);
+  }
+  var PK = q.get('pk') || '';   // an admin looking from Admin > Displays (good for an hour)
 
   function stop(title, msg) { app.innerHTML = '<div class="stop"><div><h1>' + esc(title) + '</h1><p>' + esc(msg) + '</p></div></div>'; }
   // Preview from Admin > Displays: the board comes from the editor, not from a TV link.
@@ -554,7 +564,7 @@ var LOCK = (function () {
   function list(o, k, def) { var v = (o || {})[k]; if (v == null || v === '') return def; if (v === '-') return []; return String(v).split(','); }
   // Load the page again from GitHub, never from the phone's saved copy.
   function freshLoad(tag) {
-    location.replace(location.pathname + '?d=' + encodeURIComponent(id) + '&v=' + encodeURIComponent(tag || Date.now()) + location.hash);
+    location.replace(location.pathname + '?d=' + encodeURIComponent(id) + '&v=' + encodeURIComponent(tag || Date.now()) + (PK ? '&pk=' + encodeURIComponent(PK) : '') + location.hash);
   }
   function portrait() { return window.matchMedia && matchMedia('(max-aspect-ratio: 1/1)').matches; }
 
@@ -564,19 +574,32 @@ var LOCK = (function () {
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
   }
   function load() {
-    api('oidGet', { d: id, v: st.v }).then(function (res) {
-      if (res && res.ok && res.same) { st.lastOk = Date.now(); showStatus(); return; }
+    api('oidGet', { d: id, v: st.v, dev: DEV, pk: PK }).then(function (res) {
+      if (res && res.pending) { pairScreen(res.code); return; }
+      if (res && res.ok && res.same) { st.lastOk = Date.now(); store.set('oid-ok-' + id, String(Date.now())); showStatus(); return; }
       if (!res || !res.ok) {
         if (!st.data) stop('Display', (res && res.message) || 'Waiting for the Duty Roster.');
         showStatus(res && res.message);
         return;
       }
       LOCK.open(res.box).then(function (payload) {
-        store.set('oid-box-' + id, res.box);
+        if (!PK) { store.set('oid-box-' + id, res.box); store.set('oid-ok-' + id, String(Date.now())); }
         st.v = res.v; st.lastOk = Date.now();
         take(payload);
       }, function () { stop('Display link', "This link's key doesn't match. Copy the link again from Admin > Displays."); });
     }, function () { showStatus('No connection. Trying again.'); });
+  }
+  // Not approved (yet): nothing about the board stays on the screen or in the browser.
+  function pairScreen(code) {
+    st.data = null; st.v = ''; st.prev = {}; st.changed = {};
+    store.set('oid-box-' + id, ''); store.set('oid-ok-' + id, '');
+    status.hidden = true;
+    var c = String(code || '');
+    app.innerHTML = '<div class="stop"><div><h1>Waiting for approval</h1>' +
+      (c ? '<div style="font-size:5em;font-weight:800;letter-spacing:.12em;margin:.2em 0;font-variant-numeric:tabular-nums">' + esc(c.slice(0, 3) + ' ' + c.slice(3)) + '</div>' : '') +
+      '<p>This screen isn\'t approved to show this board.</p>' +
+      '<p>An admin approves it in the Duty Roster: <b>Admin &gt; Displays &gt; this TV &gt; Devices</b>, and checks that the code matches.</p>' +
+      '<p style="opacity:.7">It starts showing the board within a minute of being approved.</p></div></div>';
   }
   function showStatus(problem) {
     var at = st.data && st.data.at ? new Date(st.data.at) : null;
@@ -1187,8 +1210,9 @@ var LOCK = (function () {
     });
     try { parent.postMessage({ oidPreviewReady: true }, '*'); } catch (e) {}
   } else {
-    var saved = store.get('oid-box-' + id);
-    if (saved) LOCK.open(saved).then(function (p) { if (!st.data) take(p); }, function () {});
+    var saved = store.get('oid-box-' + id), okAt = +(store.get('oid-ok-' + id) || 0);
+    // The copy kept on the TV shows right away only if it was approved recently.
+    if (saved && Date.now() - okAt < 6 * 3600000) LOCK.open(saved).then(function (p) { if (!st.data) take(p); }, function () {});
     load();
     setInterval(load, POLL);
     // Phones pause pages in the background: check right away when it's looked at again.
