@@ -116,6 +116,11 @@
   .paper input { width: 24px; height: 24px; margin: 0; accent-color: var(--navy); }
   .score input.sn { grid-column: 1 / -1; font-size: 16px; font-weight: 500; text-align: left; text-transform: uppercase; }
   .score input.sn::placeholder { text-transform: none; font-weight: 400; }
+  .gun { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .gun input { font-size: 16px !important; font-weight: 500 !important; text-align: left !important; }
+  .score .gun input.sn { text-transform: uppercase; grid-column: auto; }
+  .gun input::placeholder { text-transform: none; font-weight: 400; }
+  .gun-h { grid-column: 1 / -1; font-size: 14px; color: var(--muted); margin: 2px 0 -2px; }
 </style>
 </head>
 <body>
@@ -360,11 +365,16 @@ function start() {
           return '<div class="score"><div><b>' + esc(c.name) + '</b><small>Hits out of ' + c.rounds + ' · pass is ' + c.pass + '</small></div>' +
             '<input type="text" inputmode="numeric" maxlength="3" autocomplete="off" data-hits="' + esc(c.key) + '" aria-label="' + esc(c.name) + ' hits">' +
             '<label class="paper"><input type="checkbox" data-paper="' + esc(c.key) + '" checked> Every round on the silhouette</label>' +
-            '<input type="text" class="sn" data-sn="' + esc(c.key) + '" autocomplete="off" autocapitalize="characters" spellcheck="false" ' +
-              'placeholder="' + esc(c.name) + ' serial number" aria-label="' + esc(c.name) + ' serial number"></div>';
+            '<div class="gun-h">Your ' + esc(c.name.toLowerCase()) + '</div>' +
+            '<div class="gun">' +
+              '<input type="text" data-mk="' + esc(c.key) + '" maxlength="40" autocomplete="off" placeholder="Make (Glock)" aria-label="' + esc(c.name) + ' make">' +
+              '<input type="text" data-md="' + esc(c.key) + '" maxlength="40" autocomplete="off" placeholder="Model (17)" aria-label="' + esc(c.name) + ' model">' +
+              '<input type="text" data-cal="' + esc(c.key) + '" maxlength="20" autocomplete="off" placeholder="Caliber (9mm)" aria-label="' + esc(c.name) + ' caliber">' +
+              '<input type="text" class="sn" data-sn="' + esc(c.key) + '" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false" ' +
+                'placeholder="Serial number" aria-label="' + esc(c.name) + ' serial number"></div></div>';
         }).join('') +
         '<p class="note" style="margin:10px 0 0">Leave a weapon blank if you haven\'t shot it yet. You can scan again later to add it. ' +
-          'Your instructor reviews your score and signs off.</p></div>' +
+          'Your instructor checks your score and firearm and signs off. Nothing counts until they do.</p></div>' +
 
       '<div class="card"><h2><i>3</i> &nbsp;Sign with your finger</h2>' + BAR_TIP +
         '<div id="sigslot"></div></div>' +
@@ -672,11 +682,14 @@ function start() {
       req.qual = true;
       req.scores = {};
       QUAL.courses.forEach(function (c) {
-        var v = String(document.querySelector('[data-hits="' + c.key + '"]').value || '').trim();
-        if (!v) return;
+        var val = function (attr, n) { var el = document.querySelector('[data-' + attr + '="' + c.key + '"]'); return String((el && el.value) || '').replace(/\s+/g, ' ').trim().slice(0, n); };
+        var v = val('hits', 3);
+        var gun = { sn: val('sn', 30).toUpperCase(), mk: val('mk', 40), md: val('md', 40), cal: val('cal', 20) };
+        // A firearm without a score yet is sent too (the score can come later).
+        if (!v && !gun.sn && !gun.mk && !gun.md && !gun.cal) return;
+        if (v && !/^\d{1,3}$/.test(v)) badScore = c.name + ' hits should be a number.';
         if (+v > c.rounds) badScore = c.name + ' hits can\'t be more than ' + c.rounds + '.';
-        req.scores[c.key] = { h: v, p: document.querySelector('[data-paper="' + c.key + '"]').checked ? 1 : 0,
-          sn: String(document.querySelector('[data-sn="' + c.key + '"]').value || '').trim().toUpperCase().slice(0, 30) };
+        req.scores[c.key] = { h: v, p: document.querySelector('[data-paper="' + c.key + '"]').checked ? 1 : 0, sn: gun.sn, mk: gun.mk, md: gun.md, cal: gun.cal };
       });
     }
 
@@ -702,7 +715,7 @@ function start() {
       name: st.person ? st.person.name : ($('gname') ? $('gname').value.trim() : ''),
       role: (ROLES.filter(function (r) { return r[0] === st.role; })[0] || [])[1] || '',
       title: T.title, qual: !!QUAL,
-      scores: QUAL ? QUAL.courses.filter(function (c) { return req.scores[c.key]; })
+      scores: QUAL ? QUAL.courses.filter(function (c) { return req.scores[c.key] && req.scores[c.key].h !== ''; })
         .map(function (c) { return c.name + ' ' + req.scores[c.key].h + '/' + c.rounds; }) : []
     };
     // Lock everything about the officer on this phone. Only the Duty Roster can unlock it.
