@@ -124,7 +124,19 @@
   .gun input { font-size: 16px !important; font-weight: 500 !important; text-align: left !important; }
   .score .gun input.sn { text-transform: uppercase; grid-column: auto; }
   .gun input::placeholder { text-transform: none; font-weight: 400; }
-  .gun-h { grid-column: 1 / -1; font-size: 14px; color: var(--muted); margin: 2px 0 -2px; }
+  .gun-h { grid-column: 1 / -1; font-size: 14px; color: var(--muted); margin: 2px 0 -2px; display: flex; justify-content: space-between; align-items: center; }
+  .wpn { padding: 12px 0; border-top: 1px solid var(--line); }
+  .wpn:first-of-type { border-top: 0; padding-top: 2px; }
+  .wpn > .wh b { display: block; font-size: 18px; }
+  .wpn > .wh small { color: var(--muted); font-size: 14px; }
+  .gunb { margin: 10px 0 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #FAFBFD; }
+  .gunb .score { border-top: 0; padding: 0; margin: 0 0 10px; }
+  .seg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 10px; }
+  .seg2 button { min-height: 46px; border-radius: 12px; border: 1.5px solid var(--line); background: #fff; font-size: 16px; font-weight: 700; color: var(--navy); }
+  .seg2 button[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .gunb select, .gunb input[type=date] { width: 100%; min-height: 50px; padding: 0 12px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; font-size: 16px; margin: 0 0 10px; }
+  .dl { display: block; font-size: 14px; color: var(--muted); margin: 0 0 4px; }
+  .addgun { width: 100%; min-height: 46px; margin: 10px 0 0; border: 1.5px dashed var(--line); border-radius: 12px; background: #fff; font-size: 16px; font-weight: 700; color: var(--navy); }
 </style>
 </head>
 <body>
@@ -373,18 +385,14 @@ function start() {
 
       '<div class="card"><h2><i>1</i> &nbsp;Your name</h2><div id="who"></div></div>' +
 
-      '<div class="card"><h2><i>2</i> &nbsp;Your score</h2>' +
+      '<div class="card"><h2><i>2</i> &nbsp;Your scores</h2>' +
+        (QUAL.skills ? '<div class="wpn"><div class="wh"><b>Skills training</b><small>Leave it blank if the instructor marks it</small></div>' +
+          '<div class="seg2" style="margin-top:10px">' + ['Pass', 'Fail'].map(function (r) {
+            return '<button type="button" data-skill="' + r + '" aria-pressed="false">' + r + '</button>'; }).join('') + '</div></div>' : '') +
         QUAL.courses.map(function (c) {
-          return '<div class="score"><div><b>' + esc(c.name) + '</b><small>Hits out of ' + c.rounds + ' · pass is ' + c.pass + '</small></div>' +
-            '<input type="text" inputmode="numeric" maxlength="3" autocomplete="off" data-hits="' + esc(c.key) + '" aria-label="' + esc(c.name) + ' hits">' +
-            '<label class="paper"><input type="checkbox" data-paper="' + esc(c.key) + '" checked> Every round on the silhouette</label>' +
-            '<div class="gun-h">Your ' + esc(c.name.toLowerCase()) + '</div>' +
-            '<div class="gun">' +
-              '<input type="text" data-mk="' + esc(c.key) + '" maxlength="40" autocomplete="off" placeholder="Make (Glock)" aria-label="' + esc(c.name) + ' make">' +
-              '<input type="text" data-md="' + esc(c.key) + '" maxlength="40" autocomplete="off" placeholder="Model (17)" aria-label="' + esc(c.name) + ' model">' +
-              '<input type="text" data-cal="' + esc(c.key) + '" maxlength="20" autocomplete="off" placeholder="Caliber (9mm)" aria-label="' + esc(c.name) + ' caliber">' +
-              '<input type="text" class="sn" data-sn="' + esc(c.key) + '" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false" ' +
-                'placeholder="Serial number" aria-label="' + esc(c.name) + ' serial number"></div></div>';
+          return '<div class="wpn"><div class="wh"><b>' + esc(c.name) + '</b><small>Hits out of ' + c.rounds + ' · pass is ' + c.pass + '</small></div>' +
+            gunHtml(c, 0) + '<div id="more-' + esc(c.key) + '"></div>' +
+            '<button type="button" class="addgun" data-addgun="' + esc(c.key) + '">+ Add another firearm</button></div>';
         }).join('') +
         '<p class="note" style="margin:10px 0 0">Leave a weapon blank if you haven\'t shot it yet. You can scan again later to add it. ' +
           'Your instructor checks your score and firearm and signs off. Nothing counts until they do.</p></div>' +
@@ -400,9 +408,92 @@ function start() {
     drawWho();
     setUpPad();
     app.addEventListener('click', onClick);
+    app.addEventListener('click', onQualClick);
     app.addEventListener('input', onInput);
     app.addEventListener('keydown', onKey);
     $('certify').addEventListener('change', function () { $('err').textContent = ''; });
+  }
+
+  // One firearm on the qualification form: its score (the qualification
+  // or the requal, and the date), and its make, model, caliber and serial.
+  var gunSeq = 0;
+  function todayKey() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function gunHtml(c, n) {
+    var id = c.key + '|' + (gunSeq++);
+    var types = (QUAL.gunTypes && QUAL.gunTypes.length) ? QUAL.gunTypes : ['Department Issued - Admin', 'Personal', 'Other'];
+    var what = c.name.toLowerCase();
+    return '<div class="gunb" data-gb="' + esc(id) + '" data-w="' + esc(c.key) + '">' +
+      (n ? '<div class="gun-h" style="margin:0 0 8px"><b style="color:var(--navy)">Another ' + esc(what) + '</b>' +
+          '<button type="button" class="link" data-rmgun="' + esc(id) + '">Remove</button></div>' +
+        '<select data-f="ty" aria-label="Type of firearm"><option value="">Type of firearm</option>' +
+          types.map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('') + '</select>' : '') +
+      '<div class="seg2">' +
+        '<button type="button" data-try="0" aria-pressed="true">Qualification</button>' +
+        '<button type="button" data-try="1" aria-pressed="false">Requal</button></div>' +
+      '<div class="score"><div><b>Score</b><small>Hits out of ' + c.rounds + '</small></div>' +
+        '<input type="text" inputmode="numeric" maxlength="3" autocomplete="off" data-f="h" aria-label="' + esc(c.name) + ' hits">' +
+        '<label class="paper"><input type="checkbox" data-f="p" checked> Every round on the silhouette</label></div>' +
+      '<label class="dl">Date shot</label><input type="date" data-f="d" max="' + todayKey() + '" value="' + todayKey() + '" aria-label="Date shot">' +
+      '<div class="gun">' +
+        '<input type="text" data-f="mk" maxlength="40" autocomplete="off" placeholder="Make (Glock)" aria-label="' + esc(c.name) + ' make">' +
+        '<input type="text" data-f="md" maxlength="40" autocomplete="off" placeholder="Model (17)" aria-label="' + esc(c.name) + ' model">' +
+        '<input type="text" data-f="cal" maxlength="20" autocomplete="off" placeholder="Caliber (9mm)" aria-label="' + esc(c.name) + ' caliber">' +
+        '<input type="text" class="sn" data-f="sn" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Serial number" aria-label="' + esc(c.name) + ' serial number">' +
+      '</div></div>';
+  }
+  function onQualClick(e) {
+    var b = e.target.closest && e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.skill) {
+      st.skill = st.skill === b.dataset.skill ? '' : b.dataset.skill;   // tap again to clear
+      app.querySelectorAll('[data-skill]').forEach(function (x) { x.setAttribute('aria-pressed', String(x.dataset.skill === st.skill)); });
+      return;
+    }
+    if (b.dataset.try != null) {
+      b.parentNode.querySelectorAll('[data-try]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      return;
+    }
+    if (b.dataset.addgun) {
+      var c = QUAL.courses.filter(function (x) { return x.key === b.dataset.addgun; })[0];
+      if (!c) return;
+      if (app.querySelectorAll('[data-w="' + c.key + '"]').length >= 4) { $('err').textContent = 'Up to 4 firearms for each weapon.'; return; }
+      $('more-' + c.key).insertAdjacentHTML('beforeend', gunHtml(c, 1));
+      var added = $('more-' + c.key).lastElementChild;
+      if (added) { var sel = added.querySelector('select'); if (sel) sel.focus(); }
+      return;
+    }
+    if (b.dataset.rmgun) {
+      var g = app.querySelector('[data-gb="' + b.dataset.rmgun + '"]');
+      if (g) g.parentNode.removeChild(g);
+    }
+  }
+  // What the officer filled in for each weapon: { pistol: { h, p, t, d, mk, md, cal, sn, g: [more firearms] }, _skills }
+  function qualScores() {
+    var out = {}, bad = '';
+    QUAL.courses.forEach(function (c) {
+      var list = [];
+      app.querySelectorAll('[data-w="' + c.key + '"]').forEach(function (bl, n) {
+        var val = function (f, max) { var el = bl.querySelector('[data-f="' + f + '"]'); return String((el && el.value) || '').replace(/\s+/g, ' ').trim().slice(0, max); };
+        var g = { h: val('h', 3), mk: val('mk', 40), md: val('md', 40), cal: val('cal', 20), sn: val('sn', 30).toUpperCase(), ty: n ? val('ty', 40) : '' };
+        if (!g.h && !g.mk && !g.md && !g.cal && !g.sn) { list.push(null); return; }
+        if (g.h && !/^\d{1,3}$/.test(g.h)) bad = c.name + ' score should be a number.';
+        else if (+g.h > c.rounds) bad = c.name + ' score can\'t be more than ' + c.rounds + '.';
+        var pr = bl.querySelector('[data-try][aria-pressed="true"]');
+        g.t = pr ? +pr.dataset.try : 0;
+        g.p = bl.querySelector('[data-f="p"]').checked ? 1 : 0;
+        var d = val('d', 10);
+        if (d && d > todayKey()) bad = "The date can't be in the future.";
+        g.d = d;
+        list.push(g);
+      });
+      var first = list[0], rest = list.slice(1).filter(Boolean);
+      if (!first && !rest.length) return;
+      var o = first || { h: '', p: 1, t: 0 };
+      if (rest.length) o.g = rest;
+      out[c.key] = o;
+    });
+    if (QUAL.skills && st.skill) out._skills = { r: st.skill };
+    return { scores: out, bad: bad };
   }
 
   // ---------- 1. Name ----------
@@ -693,17 +784,10 @@ function start() {
     var badScore = '';
     if (QUAL) {
       req.qual = true;
-      req.scores = {};
-      QUAL.courses.forEach(function (c) {
-        var val = function (attr, n) { var el = document.querySelector('[data-' + attr + '="' + c.key + '"]'); return String((el && el.value) || '').replace(/\s+/g, ' ').trim().slice(0, n); };
-        var v = val('hits', 3);
-        var gun = { sn: val('sn', 30).toUpperCase(), mk: val('mk', 40), md: val('md', 40), cal: val('cal', 20) };
-        // A firearm without a score yet is sent too (the score can come later).
-        if (!v && !gun.sn && !gun.mk && !gun.md && !gun.cal) return;
-        if (v && !/^\d{1,3}$/.test(v)) badScore = c.name + ' hits should be a number.';
-        if (+v > c.rounds) badScore = c.name + ' hits can\'t be more than ' + c.rounds + '.';
-        req.scores[c.key] = { h: v, p: document.querySelector('[data-paper="' + c.key + '"]').checked ? 1 : 0, sn: gun.sn, mk: gun.mk, md: gun.md, cal: gun.cal };
-      });
+      // A firearm without a score yet is sent too (the score can come later).
+      var qs = qualScores();
+      req.scores = qs.scores;
+      badScore = qs.bad;
     }
 
     var problem =
@@ -728,8 +812,13 @@ function start() {
       name: st.person ? st.person.name : ($('gname') ? $('gname').value.trim() : ''),
       role: (ROLES.filter(function (r) { return r[0] === st.role; })[0] || [])[1] || '',
       title: T.title, qual: !!QUAL,
-      scores: QUAL ? QUAL.courses.filter(function (c) { return req.scores[c.key] && req.scores[c.key].h !== ''; })
-        .map(function (c) { return c.name + ' ' + req.scores[c.key].h + '/' + c.rounds; }) : []
+      scores: QUAL ? (req.scores._skills ? ['Skills training: ' + req.scores._skills.r] : []).concat([].concat.apply([], QUAL.courses.map(function (c) {
+          var o = req.scores[c.key];
+          if (!o) return [];
+          return [o].concat(o.g || []).filter(function (g) { return g.h !== ''; }).map(function (g) {
+            return c.name + (g.ty ? ' (' + g.ty + ')' : '') + (g.t ? ' requal ' : ' ') + g.h + '/' + c.rounds;
+          });
+        }))) : []
     };
     // Lock everything about the officer on this phone. Only the Duty Roster can unlock it.
     LOCK.seal({ person: req.person || null, guest: req.guest || null, role: req.role, signature: req.signature,
