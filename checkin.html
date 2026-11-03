@@ -386,9 +386,15 @@ function start() {
       '<div class="card"><h2><i>1</i> &nbsp;Your name</h2><div id="who"></div></div>' +
 
       '<div class="card"><h2><i>2</i> &nbsp;Your scores</h2>' +
-        (QUAL.skills ? '<div class="wpn"><div class="wh"><b>Skills training</b><small>Leave it blank if the instructor marks it</small></div>' +
-          '<div class="seg2" style="margin-top:10px">' + ['Pass', 'Fail'].map(function (r) {
-            return '<button type="button" data-skill="' + r + '" aria-pressed="false">' + r + '</button>'; }).join('') + '</div></div>' : '') +
+        qualItems().map(function (it) {
+          return '<div class="wpn"><div class="wh"><b>' + esc(it.name) + '</b><small>' + (it.kind === 'score' ? 'Score out of ' + it.out + ' · pass is ' + it.pass + '. ' : '') +
+              'Leave it blank if the instructor marks it</small></div>' +
+            (it.kind === 'score'
+              ? '<div class="score" style="border-top:0;padding-top:8px"><div><b>Score</b><small>Out of ' + it.out + '</small></div>' +
+                  '<input type="text" inputmode="numeric" maxlength="4" autocomplete="off" data-ck="' + esc(it.id) + '" aria-label="' + esc(it.name) + ' score"></div>'
+              : '<div class="seg2" style="margin-top:10px">' + ['Pass', 'Fail'].map(function (r) {
+                  return '<button type="button" data-skill="' + r + '" data-item="' + esc(it.id) + '" aria-pressed="false">' + r + '</button>'; }).join('') + '</div>') + '</div>';
+        }).join('') +
         QUAL.courses.map(function (c) {
           return '<div class="wpn"><div class="wh"><b>' + esc(c.name) + '</b><small>Hits out of ' + c.rounds + ' · pass is ' + c.pass + '</small></div>' +
             gunHtml(c, 0) + '<div id="more-' + esc(c.key) + '"></div>' +
@@ -417,6 +423,11 @@ function start() {
   // One firearm on the qualification form: its score (the qualification
   // or the requal, and the date), and its make, model, caliber and serial.
   var gunSeq = 0;
+  // The session's checklist items (Skills training and others).
+  function qualItems() {
+    if (QUAL.items && QUAL.items.length) return QUAL.items;
+    return QUAL.skills ? [{ id: 'skills', name: 'Skills training', kind: 'pf' }] : [];
+  }
   function todayKey() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function gunHtml(c, n) {
     var id = c.key + '|' + (gunSeq++);
@@ -445,8 +456,10 @@ function start() {
     var b = e.target.closest && e.target.closest('button');
     if (!b) return;
     if (b.dataset.skill) {
-      st.skill = st.skill === b.dataset.skill ? '' : b.dataset.skill;   // tap again to clear
-      app.querySelectorAll('[data-skill]').forEach(function (x) { x.setAttribute('aria-pressed', String(x.dataset.skill === st.skill)); });
+      var iid = b.dataset.item || 'skills';
+      st.checks = st.checks || {};
+      st.checks[iid] = st.checks[iid] === b.dataset.skill ? '' : b.dataset.skill;   // tap again to clear
+      app.querySelectorAll('[data-skill][data-item="' + iid + '"]').forEach(function (x) { x.setAttribute('aria-pressed', String(x.dataset.skill === st.checks[iid])); });
       return;
     }
     if (b.dataset.try != null) {
@@ -492,7 +505,16 @@ function start() {
       if (rest.length) o.g = rest;
       out[c.key] = o;
     });
-    if (QUAL.skills && st.skill) out._skills = { r: st.skill };
+    var ck = {};
+    qualItems().forEach(function (it) {
+      if (it.kind === 'score') {
+        var el = app.querySelector('[data-ck="' + it.id + '"]'), v = String((el && el.value) || '').trim();
+        if (!v) return;
+        if (!/^\d{1,4}$/.test(v) || +v > it.out) { bad = it.name + ' score should be 0 to ' + it.out + '.'; return; }
+        ck[it.id] = { h: v };
+      } else if (st.checks && st.checks[it.id]) ck[it.id] = { r: st.checks[it.id] };
+    });
+    if (Object.keys(ck).length) out._checks = ck;
     return { scores: out, bad: bad };
   }
 
@@ -812,7 +834,8 @@ function start() {
       name: st.person ? st.person.name : ($('gname') ? $('gname').value.trim() : ''),
       role: (ROLES.filter(function (r) { return r[0] === st.role; })[0] || [])[1] || '',
       title: T.title, qual: !!QUAL,
-      scores: QUAL ? (req.scores._skills ? ['Skills training: ' + req.scores._skills.r] : []).concat([].concat.apply([], QUAL.courses.map(function (c) {
+      scores: QUAL ? qualItems().filter(function (it) { return (req.scores._checks || {})[it.id]; }).map(function (it) {
+          var c = req.scores._checks[it.id]; return it.name + ': ' + (c.r || c.h + '/' + it.out); }).concat([].concat.apply([], QUAL.courses.map(function (c) {
           var o = req.scores[c.key];
           if (!o) return [];
           return [o].concat(o.g || []).filter(function (g) { return g.h !== ''; }).map(function (g) {
