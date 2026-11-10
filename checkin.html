@@ -432,6 +432,9 @@ function start() {
     setUpPad();
     app.addEventListener('click', onClick);
     app.addEventListener('click', onQualClick);
+    app.addEventListener('change', onGunPick);
+    app.addEventListener('focusout', function (e) { if (e.target && e.target.dataset && /^(mk|md|cal|sn)$/.test(e.target.dataset.f || '')) drawGunPicks(); });
+    drawGunPicks();
     app.addEventListener('input', onInput);
     app.addEventListener('keydown', onKey);
     $('certify').addEventListener('change', function () { $('err').textContent = ''; });
@@ -466,19 +469,66 @@ function start() {
         (c.stations.some(function (x) { return x.head; }) ? '<label class="paper" style="margin:0 0 10px"><input type="checkbox" data-f="hd" checked> Every head shot hit (' +
           esc(c.stations.filter(function (x) { return x.head; }).map(function (x) { return x.d; }).join(', ')) + ')</label>' : '')
       :
-      '<div class="seg2">' +
+      '<div class="seg2"' + (c.unscored ? ' style="grid-template-columns:1fr 1fr 1.3fr"' : '') + '>' +
         '<button type="button" data-try="0" aria-pressed="true">Qualification</button>' +
-        '<button type="button" data-try="1" aria-pressed="false">Requal</button></div>' +
-      '<div class="score"><div><b>Score</b><small>Hits out of ' + c.rounds + '</small></div>' +
+        '<button type="button" data-try="1" aria-pressed="false">Requal</button>' +
+        (c.unscored ? '<button type="button" data-try="ns" aria-pressed="false">Tested, not scored</button>' : '') + '</div>' +
+      '<div class="score" data-scorebox><div><b>Score</b><small>Hits out of ' + c.rounds + '</small></div>' +
         '<input type="text" inputmode="numeric" maxlength="3" autocomplete="off" data-f="h" aria-label="' + esc(c.name) + ' hits">' +
         '<label class="paper"><input type="checkbox" data-f="p" checked> Every round on the silhouette</label></div>') +
       '<label class="dl">Date shot</label><input type="date" data-f="d" max="' + todayKey() + '" value="' + todayKey() + '" aria-label="Date shot">' +
+      '<select data-usegun aria-label="Use a firearm already entered" hidden><option value="">Use a firearm already entered…</option></select>' +
       '<div class="gun">' +
         '<input type="text" data-f="mk" maxlength="40" autocomplete="off" placeholder="Make (Glock)" aria-label="' + esc(c.name) + ' make">' +
         '<input type="text" data-f="md" maxlength="40" autocomplete="off" placeholder="Model (17)" aria-label="' + esc(c.name) + ' model">' +
         '<input type="text" data-f="cal" maxlength="20" autocomplete="off" placeholder="Caliber (9mm)" aria-label="' + esc(c.name) + ' caliber">' +
         '<input type="text" class="sn" data-f="sn" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Serial number" aria-label="' + esc(c.name) + ' serial number">' +
       '</div></div>';
+  }
+  // Firearms to pick from: the ones typed in the other boxes on this page,
+  // and the ones sent from this phone before (kept on this phone only).
+  function knownGuns(skip) {
+    var out = [], seen = {};
+    var add = function (g) {
+      if (!g || (!g.mk && !g.md && !g.sn)) return;
+      var key = [g.mk, g.md, g.cal, g.sn].join('|').toLowerCase();
+      if (seen[key]) return; seen[key] = true; out.push({ mk: g.mk || '', md: g.md || '', cal: g.cal || '', sn: g.sn || '' });
+    };
+    app.querySelectorAll('.gunb').forEach(function (bl) {
+      if (bl === skip) return;
+      var v = function (f) { var el = bl.querySelector('[data-f="' + f + '"]'); return String((el && el.value) || '').replace(/\s+/g, ' ').trim(); };
+      add({ mk: v('mk'), md: v('md'), cal: v('cal'), sn: v('sn').toUpperCase() });
+    });
+    try { (JSON.parse(store.get('ci-guns') || '[]') || []).forEach(add); } catch (e) {}
+    return out.slice(0, 8);
+  }
+  function gunText(g) { return [[g.mk, g.md].filter(Boolean).join(' '), g.cal, g.sn ? 'SN ' + g.sn : ''].filter(Boolean).join(' · '); }
+  // Each firearm box offers the others (redrawn whenever something is typed).
+  function drawGunPicks() {
+    app.querySelectorAll('.gunb').forEach(function (bl) {
+      var sel = bl.querySelector('[data-usegun]'); if (!sel) return;
+      var list = knownGuns(bl);
+      sel.hidden = !list.length;
+      sel.innerHTML = '<option value="">Use a firearm already entered…</option>' + list.map(function (g, i) { return '<option value="' + i + '">' + esc(gunText(g)) + '</option>'; }).join('');
+      sel._guns = list;
+    });
+  }
+  function onGunPick(e) {
+    var sel = e.target;
+    if (!sel || !sel.matches || !sel.matches('[data-usegun]')) return;
+    var g = (sel._guns || [])[+sel.value], bl = sel.closest('.gunb');
+    if (!g || sel.value === '' || !bl) return;
+    ['mk', 'md', 'cal', 'sn'].forEach(function (f) { var el = bl.querySelector('[data-f="' + f + '"]'); if (el) el.value = g[f] || ''; });
+    drawGunPicks();
+  }
+  function rememberGuns(scores) {
+    try {
+      var keep = [], seen = {};
+      var add = function (g) { if (!g || (!g.mk && !g.md && !g.sn)) return; var k = [g.mk, g.md, g.cal, g.sn].join('|').toLowerCase(); if (seen[k]) return; seen[k] = true; keep.push({ mk: g.mk || '', md: g.md || '', cal: g.cal || '', sn: g.sn || '' }); };
+      QUAL.courses.forEach(function (c) { var o = scores[c.key]; if (o) [o].concat(o.g || []).forEach(add); });
+      (JSON.parse(store.get('ci-guns') || '[]') || []).forEach(add);
+      store.set('ci-guns', JSON.stringify(keep.slice(0, 8)));
+    } catch (e) {}
   }
   function onQualClick(e) {
     var b = e.target.closest && e.target.closest('button');
@@ -492,6 +542,9 @@ function start() {
     }
     if (b.dataset.try != null) {
       b.parentNode.querySelectorAll('[data-try]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      // Tested, not scored: no score to enter.
+      var sb = b.closest('.gunb').querySelector('[data-scorebox]');
+      if (sb) sb.style.display = b.dataset.try === 'ns' ? 'none' : '';
       return;
     }
     if (b.dataset.addgun) {
@@ -499,6 +552,7 @@ function start() {
       if (!c) return;
       if (app.querySelectorAll('[data-w="' + c.key + '"]').length >= 4) { $('err').textContent = 'Up to 4 firearms for each weapon.'; return; }
       $('more-' + c.key).insertAdjacentHTML('beforeend', gunHtml(c, 1));
+      drawGunPicks();
       var added = $('more-' + c.key).lastElementChild;
       if (added) { var sel = added.querySelector('select'); if (sel) sel.focus(); }
       return;
@@ -529,6 +583,14 @@ function start() {
             if (hdEl) g.hd = hdEl.checked ? 1 : 0;
           }
         }
+        var pr0 = bl.querySelector('[data-try][aria-pressed="true"]');
+        if (pr0 && pr0.dataset.try === 'ns') {
+          // Tested, not scored: the firearm and the date, no score.
+          var dn = val('d', 10);
+          if (dn && dn > todayKey()) bad = "The date can't be in the future.";
+          g.h = ''; g.ns = 1; g.t = 0; g.p = 1; g.d = dn;
+          list.push(g); return;
+        }
         if (!g.h && !g.mk && !g.md && !g.cal && !g.sn) { list.push(null); return; }
         if (g.h && !/^\d{1,3}$/.test(g.h)) bad = c.name + ' score should be a number.';
         else if (+g.h > c.rounds) bad = c.name + ' score can\'t be more than ' + c.rounds + '.';
@@ -558,7 +620,7 @@ function start() {
     if (Object.keys(ck).length) out._checks = ck;
     // The instructor: needed with a score (a firearm alone can be sent without one).
     var qi = $('qinst'), inst = qi ? qi.value : '';
-    var scored = QUAL.courses.some(function (c) { var o = out[c.key]; return o && [o].concat(o.g || []).some(function (g) { return g.h !== '' && g.h != null; }); });
+    var scored = QUAL.courses.some(function (c) { var o = out[c.key]; return o && [o].concat(o.g || []).some(function (g) { return g.ns || (g.h !== '' && g.h != null); }); });
     if (qi && scored && !inst && !bad) bad = 'Pick your instructor.';
     if (inst) { out._inst = inst; store.set('ci-inst', inst); }
     return { scores: out, bad: bad };
@@ -910,7 +972,8 @@ function start() {
           var c = req.scores._checks[it.id]; return it.name + ': ' + (c.r || c.h + '/' + it.out); }).concat([].concat.apply([], QUAL.courses.map(function (c) {
           var o = req.scores[c.key];
           if (!o) return [];
-          return [o].concat(o.g || []).filter(function (g) { return g.h !== ''; }).map(function (g) {
+          return [o].concat(o.g || []).filter(function (g) { return g.ns || g.h !== ''; }).map(function (g) {
+            if (g.ns) return c.name + (g.ty ? ' (' + g.ty + ')' : '') + ': tested, not scored';
             return c.name + (g.ty ? ' (' + g.ty + ')' : '') + (g.t ? ' requal ' : ' ') + g.h + '/' + c.rounds +
               (c.stations && g.st && c.stations.some(function (x, i) { return g.st[i] < x.min; }) ? ' (under a minimum: see your instructor)' : '');
           });
@@ -929,6 +992,7 @@ function start() {
           }
           shown.at = res.at;
           store.set(doneKey, JSON.stringify({ name: shown.name, at: res.at }));
+          if (QUAL && req.scores) rememberGuns(req.scores);
           success(shown);
         })
         .withFailureHandler(function () {
