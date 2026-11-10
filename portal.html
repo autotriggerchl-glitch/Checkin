@@ -212,12 +212,22 @@
   if (st.token && st.email) { st.step = 'home'; try { st.data = JSON.parse(store.get('portal-home') || 'null'); } catch (e) {} render(); loadHome(); }
   else render();
 
+  // A range day just sent shows "sent" until the Duty Roster brings it in
+  // (a few minutes). The page checks again each minute until it has posted.
+  var postTimer = null, postTries = 0;
+  function postWatch(n) {
+    clearTimeout(postTimer);
+    var waiting = st.data && (st.data.times || []).some(function (w) { return (w.blocks || []).some(function (b) { return b.sending; }); });
+    postTries = waiting ? n : 0;
+    if (!waiting || n <= 0) { postTries = 0; return; }
+    postTimer = setTimeout(function () { postTries = n - 1; if (st.step === 'home') loadHome(true); }, 60000);
+  }
   function loadHome(quiet) {
     api('portalHome', { email: st.email, token: st.token }).then(function (res) {
       if (res && res.ok) {
         st.data = res; store.set('portal-home', JSON.stringify(res));
         if (res.patch) { var img = $('patch'); img.src = res.patch; img.hidden = false; img.onerror = function () { img.hidden = true; }; }
-        render(); return;
+        render(); if (postTries > 0) postWatch(postTries); return;
       }
       if (res && res.pin) { st.token = ''; store.set('portal-token', ''); st.step = 'login'; st.err = 'Sign in again with your PIN.'; render(); return; }
       if (!quiet) toast((res && res.message) || 'That didn\'t load.', true);
@@ -414,6 +424,13 @@
   }
   function timeRequest(id) {
     var w = timeFind(id); if (!w) return;
+    // Times that have already passed today can't be picked.
+    var gone = function (d, t) {
+      var n = new Date(), p2 = function (x) { return ('0' + x).slice(-2); };
+      var nd = n.getFullYear() + '-' + p2(n.getMonth() + 1) + '-' + p2(n.getDate()), nt = p2(n.getHours()) + p2(n.getMinutes());
+      return d < nd || (d === nd && String(t) <= nt);
+    };
+    w = Object.assign({}, w, { slots: (w.slots || []).filter(function (s) { return !gone(s.d, s.t); }) });
     var ov = $('ov'), days = [];
     w.slots.forEach(function (s) { if (days.indexOf(s.d) < 0) days.push(s.d); });
     var today = st.data.today || '';
@@ -454,6 +471,7 @@
         keep();
         if (!tq.d) { $('tr-err').textContent = 'Pick a day.'; return; }
         if (!/^\d{4}$/.test(tq.t)) { $('tr-err').textContent = 'Pick a time.'; return; }
+        if (gone(tq.d, tq.t)) { $('tr-err').textContent = 'That time has already passed. Pick a later time.'; return; }
         var b = this; b.disabled = true; b.textContent = 'Sending…';
         timeSend({ w: w.id, op: 'req', d: tq.d, t: tq.t, b: tq.other ? '' : tq.b, note: tq.note || '' }, function (res) {
           if (!res || !res.ok) { b.disabled = false; b.textContent = 'Send request'; $('tr-err').textContent = (res && res.message) || 'That didn\'t go through.'; return; }
@@ -490,7 +508,7 @@
       var head = b.d !== day ? '<div class="rd-day">' + esc(md(b.d)) + '</div>' : '';
       day = b.d;
       return head + '<div class="rd-row"><div><b>' + esc(b.start + '–' + b.end) + ' · ' + esc(b.who || 'Instructor') + '</b><small>' +
-        esc(b.per + (b.per === 1 ? ' shooter' : ' shooters') + ' at a time' + (b.booked ? ' · ' + b.booked + ' booked' : '') + (b.sending ? ' · saving…' : '')) + '</small></div>' +
+        esc(b.per + (b.per === 1 ? ' shooter' : ' shooters') + ' at a time' + (b.booked ? ' · ' + b.booked + ' booked' : '') + (b.sending ? ' · sent, posts in a few minutes' : '')) + '</small></div>' +
         '<button type="button" class="link" data-rde="' + esc(w.id + '|' + b.id) + '">Change</button></div>';
     }).join('');
     return '<div class="bid rd open" id="c-rd-' + esc(w.id) + '"><div class="hd"><b>' + esc(w.title) + '</b><small>' + esc(md(w.from) + ' to ' + md(w.to) + ' · one instructor at a time') + '</small></div>' +
@@ -521,7 +539,7 @@
       timeSend(Object.assign({ w: w.id, op: 'block' }, arg), function (res) {
         if (!res || !res.ok) { btn.disabled = false; btn.textContent = label; $('rd-err').textContent = (res && res.message) || 'That didn\'t go through.'; return; }
         ov.hidden = true; render(); toast(res.message);
-        setTimeout(function () { loadHome(true); }, 90000);
+        postWatch(8);
       });
     };
     $('rdgo').onclick = function () {
