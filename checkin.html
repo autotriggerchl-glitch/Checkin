@@ -144,6 +144,7 @@
   .seg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 10px; }
   .seg2 button { min-height: 46px; border-radius: 12px; border: 1.5px solid var(--line); background: #fff; font-size: 16px; font-weight: 700; color: var(--navy); }
   .seg2 button[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+  #qinst { width: 100%; min-height: 50px; padding: 0 12px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; font-size: 17px; margin: 0 0 4px; }
   .gunb select, .gunb input[type=date] { width: 100%; min-height: 50px; padding: 0 12px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; font-size: 16px; margin: 0 0 10px; }
   .dl { display: block; font-size: 14px; color: var(--muted); margin: 0 0 4px; }
   .addgun { width: 100%; min-height: 46px; margin: 10px 0 0; border: 1.5px dashed var(--line); border-radius: 12px; background: #fff; font-size: 16px; font-weight: 700; color: var(--navy); }
@@ -396,6 +397,9 @@ function start() {
       '<div class="card"><h2><i>1</i> &nbsp;Your name</h2><div id="who"></div></div>' +
 
       '<div class="card"><h2><i>2</i> &nbsp;Your scores</h2>' +
+        (QUAL.instructors && QUAL.instructors.length ? '<div class="wpn"><div class="wh"><b>Your instructor</b><small>Who ran your line today. Your scores go on their sheet.</small></div>' +
+          '<select id="qinst" aria-label="Your instructor" style="margin-top:10px"><option value="">Pick your instructor</option>' + QUAL.instructors.map(function (n) {
+            return '<option' + (store.get('ci-inst') === n ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></div>' : '') +
         qualItems().map(function (it) {
           return '<div class="wpn"><div class="wh"><b>' + esc(it.name) + '</b><small>' + (it.kind === 'score' ? 'Score out of ' + it.out + ' · pass is ' + it.pass + '. ' : '') +
               'Leave it blank if the instructor marks it</small></div>' +
@@ -552,6 +556,11 @@ function start() {
       } else if (st.checks && st.checks[it.id]) ck[it.id] = { r: st.checks[it.id] };
     });
     if (Object.keys(ck).length) out._checks = ck;
+    // The instructor: needed with a score (a firearm alone can be sent without one).
+    var qi = $('qinst'), inst = qi ? qi.value : '';
+    var scored = QUAL.courses.some(function (c) { var o = out[c.key]; return o && [o].concat(o.g || []).some(function (g) { return g.h !== '' && g.h != null; }); });
+    if (qi && scored && !inst && !bad) bad = 'Pick your instructor.';
+    if (inst) { out._inst = inst; store.set('ci-inst', inst); }
     return { scores: out, bad: bad };
   }
 
