@@ -124,6 +124,11 @@
   .gun input { font-size: 16px !important; font-weight: 500 !important; text-align: left !important; }
   .score .gun input.sn { text-transform: uppercase; grid-column: auto; }
   .gun input::placeholder { text-transform: none; font-weight: 400; }
+  /* An example belongs in the label: a grey word inside an empty box
+     looked like it was already filled in. */
+  .gl { display: block; font-size: 13px; font-weight: 700; color: var(--muted); }
+  .gl input { width: 100%; margin-top: 3px; }
+  .eg { font-style: normal; font-weight: 400; }
   .gun-h { grid-column: 1 / -1; font-size: 14px; color: var(--muted); margin: 2px 0 -2px; display: flex; justify-content: space-between; align-items: center; }
   .wpn { padding: 12px 0; border-top: 1px solid var(--line); }
   .wpn:first-of-type { border-top: 0; padding-top: 2px; }
@@ -478,10 +483,14 @@ function start() {
       '<label class="dl">Date shot</label><input type="date" data-f="d" max="' + todayKey() + '" value="' + todayKey() + '" aria-label="Date shot">' +
       '<select data-usegun aria-label="Use a firearm already entered" hidden><option value="">Use a firearm already entered…</option></select>' +
       '<div class="gun">' +
-        '<input type="text" data-f="mk" maxlength="40" autocomplete="off" placeholder="Make (Glock)" aria-label="' + esc(c.name) + ' make">' +
-        '<input type="text" data-f="md" maxlength="40" autocomplete="off" placeholder="Model (17)" aria-label="' + esc(c.name) + ' model">' +
-        '<input type="text" data-f="cal" maxlength="20" autocomplete="off" placeholder="Caliber (9mm)" aria-label="' + esc(c.name) + ' caliber">' +
-        '<input type="text" class="sn" data-f="sn" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Serial number" aria-label="' + esc(c.name) + ' serial number">' +
+        '<label class="gl">Make <em class="eg">e.g. Glock</em>' +
+          '<input type="text" data-f="mk" maxlength="40" autocomplete="off" aria-label="' + esc(c.name) + ' make"></label>' +
+        '<label class="gl">Model <em class="eg">e.g. 17</em>' +
+          '<input type="text" data-f="md" maxlength="40" autocomplete="off" aria-label="' + esc(c.name) + ' model"></label>' +
+        '<label class="gl">Caliber <em class="eg">e.g. 9mm</em>' +
+          '<input type="text" data-f="cal" maxlength="20" autocomplete="off" aria-label="' + esc(c.name) + ' caliber"></label>' +
+        '<label class="gl">Serial number' +
+          '<input type="text" class="sn" data-f="sn" maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="' + esc(c.name) + ' serial number"></label>' +
       '</div></div>';
   }
   // Firearms to pick from: the ones typed in the other boxes on this page,
