@@ -451,13 +451,13 @@ function start() {
   function todayKey() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function gunHtml(c, n) {
     var id = c.key + '|' + (gunSeq++);
-    var types = (QUAL.gunTypes && QUAL.gunTypes.length) ? QUAL.gunTypes : ['Department Issued - Admin', 'Personal', 'Other'];
+    var types = (QUAL.gunTypes && QUAL.gunTypes.length) ? QUAL.gunTypes : ['Department Issued', 'Department Issued - Admin', 'Personal', 'Other'];
     var what = c.name.toLowerCase();
     return '<div class="gunb" data-gb="' + esc(id) + '" data-w="' + esc(c.key) + '">' +
       (n ? '<div class="gun-h" style="margin:0 0 8px"><b style="color:var(--navy)">Another ' + esc(what) + '</b>' +
-          '<button type="button" class="link" data-rmgun="' + esc(id) + '">Remove</button></div>' +
-        '<select data-f="ty" aria-label="Type of firearm"><option value="">Type of firearm</option>' +
-          types.map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('') + '</select>' : '') +
+          '<button type="button" class="link" data-rmgun="' + esc(id) + '">Remove</button></div>' : '') +
+      '<select data-f="ty" aria-label="Type of firearm"><option value="">Type of firearm</option>' +
+        types.map(function (t) { return '<option' + (!n && t === types[0] ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>' +
       (c.stations ?
         '<div class="stg">' + c.stations.map(function (x, i) {
             return '<label>' + esc(x.d) + '<input type="text" inputmode="numeric" maxlength="2" autocomplete="off" data-st="' + i + '" data-n="' + x.n + '" data-min="' + x.min + '" ' +
@@ -469,10 +469,9 @@ function start() {
         (c.stations.some(function (x) { return x.head; }) ? '<label class="paper" style="margin:0 0 10px"><input type="checkbox" data-f="hd" checked> Every head shot hit (' +
           esc(c.stations.filter(function (x) { return x.head; }).map(function (x) { return x.d; }).join(', ')) + ')</label>' : '')
       :
-      '<div class="seg2"' + (c.unscored ? ' style="grid-template-columns:1fr 1fr 1.3fr"' : '') + '>' +
+      '<div class="seg2">' +
         '<button type="button" data-try="0" aria-pressed="true">Qualification</button>' +
-        '<button type="button" data-try="1" aria-pressed="false">Requal</button>' +
-        (c.unscored ? '<button type="button" data-try="ns" aria-pressed="false">Tested, not scored</button>' : '') + '</div>' +
+        '<button type="button" data-try="1" aria-pressed="false">Requal</button></div>' +
       '<div class="score" data-scorebox><div><b>Score</b><small>Hits out of ' + c.rounds + '</small></div>' +
         '<input type="text" inputmode="numeric" maxlength="3" autocomplete="off" data-f="h" aria-label="' + esc(c.name) + ' hits">' +
         '<label class="paper"><input type="checkbox" data-f="p" checked> Every round on the silhouette</label></div>') +
@@ -542,9 +541,6 @@ function start() {
     }
     if (b.dataset.try != null) {
       b.parentNode.querySelectorAll('[data-try]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
-      // Tested, not scored: no score to enter.
-      var sb = b.closest('.gunb').querySelector('[data-scorebox]');
-      if (sb) sb.style.display = b.dataset.try === 'ns' ? 'none' : '';
       return;
     }
     if (b.dataset.addgun) {
@@ -569,7 +565,7 @@ function start() {
       var list = [];
       app.querySelectorAll('[data-w="' + c.key + '"]').forEach(function (bl, n) {
         var val = function (f, max) { var el = bl.querySelector('[data-f="' + f + '"]'); return String((el && el.value) || '').replace(/\s+/g, ' ').trim().slice(0, max); };
-        var g = { h: val('h', 3), mk: val('mk', 40), md: val('md', 40), cal: val('cal', 20), sn: val('sn', 30).toUpperCase(), ty: n ? val('ty', 40) : '' };
+        var g = { h: val('h', 3), mk: val('mk', 40), md: val('md', 40), cal: val('cal', 20), sn: val('sn', 30).toUpperCase(), ty: val('ty', 40) };
         if (c.stations) {
           // Hits at each distance: all of them, or none (the firearm alone can be sent first).
           var boxes = [].slice.call(bl.querySelectorAll('[data-st]')).map(function (el) { return String(el.value || '').trim(); });
@@ -583,15 +579,7 @@ function start() {
             if (hdEl) g.hd = hdEl.checked ? 1 : 0;
           }
         }
-        var pr0 = bl.querySelector('[data-try][aria-pressed="true"]');
-        if (pr0 && pr0.dataset.try === 'ns') {
-          // Tested, not scored: the firearm and the date, no score.
-          var dn = val('d', 10);
-          if (dn && dn > todayKey()) bad = "The date can't be in the future.";
-          g.h = ''; g.ns = 1; g.t = 0; g.p = 1; g.d = dn;
-          list.push(g); return;
-        }
-        if (!g.h && !g.mk && !g.md && !g.cal && !g.sn) { list.push(null); return; }
+        if (!g.h && !g.mk && !g.md && !g.cal && !g.sn && !(g.st && g.st.length)) { list.push(null); return; }
         if (g.h && !/^\d{1,3}$/.test(g.h)) bad = c.name + ' score should be a number.';
         else if (+g.h > c.rounds) bad = c.name + ' score can\'t be more than ' + c.rounds + '.';
         var pr = bl.querySelector('[data-try][aria-pressed="true"]');
@@ -620,7 +608,7 @@ function start() {
     if (Object.keys(ck).length) out._checks = ck;
     // The instructor: needed with a score (a firearm alone can be sent without one).
     var qi = $('qinst'), inst = qi ? qi.value : '';
-    var scored = QUAL.courses.some(function (c) { var o = out[c.key]; return o && [o].concat(o.g || []).some(function (g) { return g.ns || (g.h !== '' && g.h != null); }); });
+    var scored = QUAL.courses.some(function (c) { var o = out[c.key]; return o && [o].concat(o.g || []).some(function (g) { return g.h !== '' && g.h != null; }); });
     if (qi && scored && !inst && !bad) bad = 'Pick your instructor.';
     if (inst) { out._inst = inst; store.set('ci-inst', inst); }
     return { scores: out, bad: bad };
@@ -972,8 +960,7 @@ function start() {
           var c = req.scores._checks[it.id]; return it.name + ': ' + (c.r || c.h + '/' + it.out); }).concat([].concat.apply([], QUAL.courses.map(function (c) {
           var o = req.scores[c.key];
           if (!o) return [];
-          return [o].concat(o.g || []).filter(function (g) { return g.ns || g.h !== ''; }).map(function (g) {
-            if (g.ns) return c.name + (g.ty ? ' (' + g.ty + ')' : '') + ': tested, not scored';
+          return [o].concat(o.g || []).filter(function (g) { return g.h !== ''; }).map(function (g) {
             return c.name + (g.ty ? ' (' + g.ty + ')' : '') + (g.t ? ' requal ' : ' ') + g.h + '/' + c.rounds +
               (c.stations && g.st && c.stations.some(function (x, i) { return g.st[i] < x.min; }) ? ' (under a minimum: see your instructor)' : '');
           });
