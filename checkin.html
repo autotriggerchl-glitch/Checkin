@@ -134,6 +134,12 @@
   .wpn:first-of-type { border-top: 0; padding-top: 2px; }
   .wpn > .wh b { display: block; font-size: 18px; }
   .wpn > .wh small { color: var(--muted); font-size: 14px; }
+  .later { display: flex; gap: 12px; align-items: flex-start; margin: 10px 0 0; padding: 12px; border: 1px dashed var(--line); border-radius: 12px; background: #FAFBFD; cursor: pointer; }
+  .later input { flex: none; width: 26px; height: 26px; margin: 0; accent-color: var(--navy); }
+  .later b { display: block; font-size: 16px; }
+  .later small { display: block; color: var(--muted); font-size: 14px; }
+  .wpn.isLater .gunb, .wpn.isLater .addgun, .wpn.isLater .score, .wpn.isLater .seg2, .wpn.isLater [id^="more-"] { display: none; }
+  .wpn.isLater .later { border-style: solid; border-color: var(--navy); background: #F3F6FB; }
   .gunb { margin: 10px 0 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #FAFBFD; }
   .gunb .score { border-top: 0; padding: 0; margin: 0 0 10px; }
   /* Hits at each distance (MPTC courses) */
@@ -406,8 +412,8 @@ function start() {
           '<select id="qinst" aria-label="Your instructor" style="margin-top:10px"><option value="">Pick your instructor</option>' + QUAL.instructors.map(function (n) {
             return '<option' + (store.get('ci-inst') === n ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select></div>' : '') +
         qualItems().map(function (it) {
-          return '<div class="wpn"><div class="wh"><b>' + esc(it.name) + '</b><small>' + (it.kind === 'score' ? 'Score out of ' + it.out + ' · pass is ' + it.pass + '. ' : '') +
-              'Leave it blank if the instructor marks it</small></div>' +
+          return '<div class="wpn" data-sec="' + esc(it.id) + '"><div class="wh"><b>' + esc(it.name) + '</b><small>' + (it.kind === 'score' ? 'Score out of ' + it.out + ' · pass is ' + it.pass + '. ' : '') +
+              'Leave it blank if the instructor marks it</small></div>' + laterHtml(it.id, it.name) +
             (it.kind === 'score'
               ? '<div class="score" style="border-top:0;padding-top:8px"><div><b>Score</b><small>Out of ' + it.out + '</small></div>' +
                   '<input type="text" inputmode="numeric" maxlength="4" autocomplete="off" data-ck="' + esc(it.id) + '" aria-label="' + esc(it.name) + ' score"></div>'
@@ -415,8 +421,8 @@ function start() {
                   return '<button type="button" data-skill="' + r + '" data-item="' + esc(it.id) + '" aria-pressed="false">' + r + '</button>'; }).join('') + '</div>') + '</div>';
         }).join('') +
         QUAL.courses.map(function (c) {
-          return '<div class="wpn"><div class="wh"><b>' + esc(c.name) + '</b><small>' + (c.stations ? c.rounds + ' rounds · every distance needs its minimum hits (' + c.pass + ' in all)'
-              : 'Hits out of ' + c.rounds + ' · pass is ' + c.pass) + '</small></div>' +
+          return '<div class="wpn" data-sec="' + esc(c.key) + '"><div class="wh"><b>' + esc(c.name) + '</b><small>' + (c.stations ? c.rounds + ' rounds · every distance needs its minimum hits (' + c.pass + ' in all)'
+              : 'Hits out of ' + c.rounds + ' · pass is ' + c.pass) + '</small></div>' + laterHtml(c.key, c.name) +
             gunHtml(c, 0) + '<div id="more-' + esc(c.key) + '"></div>' +
             '<button type="button" class="addgun" data-addgun="' + esc(c.key) + '">+ Add another firearm</button></div>';
         }).join('') +
@@ -438,6 +444,7 @@ function start() {
     app.addEventListener('click', onClick);
     app.addEventListener('click', onQualClick);
     app.addEventListener('change', onGunPick);
+    app.addEventListener('change', onLaterTick);
     app.addEventListener('focusout', function (e) { if (e.target && e.target.dataset && /^(mk|md|cal|sn)$/.test(e.target.dataset.f || '')) drawGunPicks(); });
     drawGunPicks();
     app.addEventListener('input', onInput);
@@ -452,6 +459,25 @@ function start() {
   function qualItems() {
     if (QUAL.items && QUAL.items.length) return QUAL.items;
     return QUAL.skills ? [{ id: 'skills', name: 'Skills training', kind: 'pf' }] : [];
+  }
+  // "Another day": the officer says they aren't doing this one today. It
+  // isn't a result, so nothing counts; the instructor sees it on their
+  // screen and can put it back.
+  function laterHtml(key, name) {
+    return '<label class="later"><input type="checkbox" data-later="' + esc(key) + '">' +
+      '<span><b>Another day</b><small>' + esc(name) + ' is not happening today. Nothing to fill in here.</small></span></label>';
+  }
+  function onLaterTick(e) {
+    var el = e.target;
+    if (!el || !el.dataset || el.dataset.later == null) return;
+    var sec = el.closest('.wpn');
+    if (sec) sec.classList.toggle('isLater', el.checked);
+    $('err').textContent = '';
+  }
+  function laterKeys() {
+    var out = [];
+    app.querySelectorAll('[data-later]').forEach(function (el) { if (el.checked) out.push(el.dataset.later); });
+    return out;
   }
   function todayKey() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function gunHtml(c, n) {
@@ -570,7 +596,9 @@ function start() {
   // What the officer filled in for each weapon: { pistol: { h, p, t, d, mk, md, cal, sn, g: [more firearms] }, _skills }
   function qualScores() {
     var out = {}, bad = '';
+    var later = laterKeys(), isLater = function (k) { return later.indexOf(k) >= 0; };
     QUAL.courses.forEach(function (c) {
+      if (isLater(c.key)) return;   // another day: nothing to send for it
       var list = [];
       app.querySelectorAll('[data-w="' + c.key + '"]').forEach(function (bl, n) {
         var val = function (f, max) { var el = bl.querySelector('[data-f="' + f + '"]'); return String((el && el.value) || '').replace(/\s+/g, ' ').trim().slice(0, max); };
@@ -607,6 +635,7 @@ function start() {
     });
     var ck = {};
     qualItems().forEach(function (it) {
+      if (isLater(it.id)) return;
       if (it.kind === 'score') {
         var el = app.querySelector('[data-ck="' + it.id + '"]'), v = String((el && el.value) || '').trim();
         if (!v) return;
@@ -615,9 +644,11 @@ function start() {
       } else if (st.checks && st.checks[it.id]) ck[it.id] = { r: st.checks[it.id] };
     });
     if (Object.keys(ck).length) out._checks = ck;
+    if (later.length) out._later = later;
     // The instructor: needed with a score (a firearm alone can be sent without one).
     var qi = $('qinst'), inst = qi ? qi.value : '';
     var scored = QUAL.courses.some(function (c) { var o = out[c.key]; return o && [o].concat(o.g || []).some(function (g) { return g.h !== '' && g.h != null; }); });
+    if (later.length === QUAL.courses.length + qualItems().length && !bad) bad = "You've marked everything for another day. Tick one off, or see your instructor.";
     if (qi && scored && !inst && !bad) bad = 'Pick your instructor.';
     if (inst) { out._inst = inst; store.set('ci-inst', inst); }
     return { scores: out, bad: bad };
@@ -965,6 +996,10 @@ function start() {
       name: st.person ? st.person.name : ($('gname') ? $('gname').value.trim() : ''),
       role: (ROLES.filter(function (r) { return r[0] === st.role; })[0] || [])[1] || '',
       title: T.title, qual: !!QUAL,
+      later: QUAL ? (req.scores._later || []).map(function (k) {
+          var c = QUAL.courses.filter(function (x) { return x.key === k; })[0];
+          return (c ? c.name : (qualItems().filter(function (i2) { return i2.id === k; })[0] || {}).name || k) + ': another day';
+        }) : [],
       scores: QUAL ? qualItems().filter(function (it) { return (req.scores._checks || {})[it.id]; }).map(function (it) {
           var c = req.scores._checks[it.id]; return it.name + ': ' + (c.r || c.h + '/' + it.out); }).concat([].concat.apply([], QUAL.courses.map(function (c) {
           var o = req.scores[c.key];
@@ -1009,6 +1044,7 @@ function start() {
         '<h1>Sent</h1>' +
         '<p><b>' + esc(res.name) + '</b> · ' + esc(res.at) + '</p>' +
         (res.scores && res.scores.length ? '<p>' + esc(res.scores.join(' · ')) + '</p>' : '<p>Checked in. No score entered yet.</p>') +
+        ((res.later || []).length ? '<p class="note">' + esc(res.later.join(' · ')) + '</p>' : '') +
         '<p class="note" style="margin-top:14px">Your instructor reviews it and signs off. To add a score later, scan the code again.</p></div>';
       window.scrollTo(0, 0);
       return;
