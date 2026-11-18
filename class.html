@@ -323,9 +323,26 @@ function start() {
   // ---- Which squad is off, counted forward from the anchor in config.js ----
   // Four on, four off, two squads: an eight-day cycle. One squad works
   // every day, so the other one is off.
+  // Four on, four off, A and B alternating. The anchor is a date that
+  // was the FIRST of a four-day block, and letter is the squad that
+  // started working it: 17 Nov 2026 was Squad A's first day, through
+  // the 20th.
+  //
+  // It lives here rather than only in config.js so that installing this
+  // one file is enough. config.js can still override it - set anchor to
+  // '' there to switch the labels off, or to a new date if the rotation
+  // ever resets.
   function rota() {
-    var r = (typeof SQUAD_ROTATION !== 'undefined') ? SQUAD_ROTATION : null;
-    if (!r || !r.anchor || !/^\d{4}-\d{2}-\d{2}$/.test(r.anchor)) return null;
+    // Inside the function on purpose: render() runs before the bottom of
+    // this module is reached, so a var out here is still undefined the
+    // first time anything asks.
+    var SQUAD_FALLBACK = { anchor: '2026-11-17', letter: 'A', on: 4, off: 4, squads: ['A', 'B'] };
+    // config.js wins only when it names a real date. An old config.js,
+    // or one still carrying the blank anchor it shipped with, falls back
+    // to the date above rather than silently switching the labels off.
+    var good = function (x) { return x && /^\d{4}-\d{2}-\d{2}$/.test(x.anchor || ''); };
+    var r = (typeof SQUAD_ROTATION !== 'undefined' && good(SQUAD_ROTATION)) ? SQUAD_ROTATION : SQUAD_FALLBACK;
+    if (!good(r)) return null;
     var sq = (r.squads && r.squads.length === 2) ? r.squads : ['A', 'B'];
     var on = +r.on || 4, off = +r.off || 4;
     return { anchor: r.anchor, letter: r.letter || sq[0], on: on, off: off, cycle: on + off, squads: sq };
