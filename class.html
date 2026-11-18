@@ -152,6 +152,9 @@
   .calday.got { background: var(--okbg); color: var(--ok); }
   .calday.got i { color: var(--ok); }
   .calday.sel { outline: 2.5px solid var(--navy); outline-offset: -2.5px; }
+  .squadtog { display: flex; align-items: center; gap: 9px; margin: -4px 2px 12px; font-size: 15px; color: var(--muted); }
+  .squadtog input { width: 20px; height: 20px; accent-color: var(--navy); }
+  .squadoff { color: var(--navy) !important; font-weight: 700 !important; }
   .calnav { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
   .calnav b { flex: 1; text-align: center; font-size: 16px; font-weight: 700; color: var(--navy); }
   .calnav button { flex: none; width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid var(--line);
@@ -316,6 +319,29 @@ function start() {
     return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(+m[1], +m[2] - 1, +m[3]).getDay()] + ' ' + (+m[2]) + '/' + (+m[3]);
   }
   function times(d) { return d.start ? d.start + (d.end ? '-' + d.end : '') : ''; }
+
+  // ---- Which squad is off, counted forward from the anchor in config.js ----
+  // Four on, four off, two squads: an eight-day cycle. One squad works
+  // every day, so the other one is off.
+  function rota() {
+    var r = (typeof SQUAD_ROTATION !== 'undefined') ? SQUAD_ROTATION : null;
+    if (!r || !r.anchor || !/^\d{4}-\d{2}-\d{2}$/.test(r.anchor)) return null;
+    var sq = (r.squads && r.squads.length === 2) ? r.squads : ['A', 'B'];
+    var on = +r.on || 4, off = +r.off || 4;
+    return { anchor: r.anchor, letter: r.letter || sq[0], on: on, off: off, cycle: on + off, squads: sq };
+  }
+  function ymdToDays(k) {
+    return Math.round(Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10)) / 86400000);
+  }
+  // The squad OFF on this date, or '' when the rotation isn't set up.
+  function squadOff(key) {
+    var r = rota();
+    if (!r || !/^\d{4}-\d{2}-\d{2}$/.test(key)) return '';
+    var n = ((ymdToDays(key) - ymdToDays(r.anchor)) % r.cycle + r.cycle) % r.cycle;
+    var working = n < r.on ? r.letter : (r.squads[0] === r.letter ? r.squads[1] : r.squads[0]);
+    return r.squads[0] === working ? r.squads[1] : r.squads[0];
+  }
+  function showSquads() { return rota() && store.get('ci-class-squads') !== 'off'; }
   // The same person: by call sign when both have one, otherwise by name.
   function samePerson(x, me) {
     if (!me) return false;
@@ -440,7 +466,12 @@ function start() {
         Object.keys(SORTS).filter(function (k) { return isIS() || k !== 'topic'; }).map(function (k) {
           return '<option value="' + k + '"' + (sortBy === k ? ' selected' : '') + '>' + SORTS[k] + '</option>';
         }).join('') + '</select></div>';
-    } else if (sortBy === 'cal') sortBy = isIS() ? 'topic' : 'date';
+    }
+    if (rota() && (canPick || c.dates.length > 1)) {
+      html += '<label class="squadtog"><input type="checkbox" id="squadtog"' + (showSquads() ? ' checked' : '') +
+        '> Show which squad is off</label>';
+    }
+    if (!canPick && sortBy === 'cal') sortBy = isIS() ? 'topic' : 'date';
     if (sortBy === 'cal') {
       html += calHtml(closed, busyDays);
     } else if (isIS() && sortBy === 'date') {
@@ -534,7 +565,8 @@ function start() {
       var list = byDate[key];
       if (!list) { html += '<span class="calday">' + n + '</span>'; continue; }
       var picked = list.some(function (d) { return calPick[d.id]; });
-      var mark = picked ? '\u2713' : mineDays[key] ? '\u2713' : list.length > 1 ? list.length : '\u00b7';
+      var sq = showSquads() ? squadOff(key) : '';
+      var mark = picked || mineDays[key] ? '\u2713' : sq ? sq : list.length > 1 ? list.length : '\u00b7';
       html += '<button type="button" data-calday="' + key + '" aria-pressed="' + picked + '" aria-label="' + esc(day(key)) + '"' +
         ' class="calday has' + (mineDays[key] ? ' got' : '') + (picked ? ' pick' : '') + (calDay === key ? ' sel' : '') + '">' +
         n + '<i>' + mark + '</i></button>';
@@ -542,7 +574,8 @@ function start() {
     html += '</div><div class="callegend">' +
       '<span><b style="background:#E6EBF3"></b>Has a class</span>' +
       '<span><b style="background:var(--ok)"></b>Booked</span>' +
-      '<span><b style="background:var(--navy)"></b>Picked</span></div></div>';
+      '<span><b style="background:var(--navy)"></b>Picked</span>' +
+      (showSquads() ? '<span>A / B \u2014 squad off that day</span>' : '') + '</div></div>';
 
     // A day with more than one session: open it so the right one can be
     // chosen rather than guessed.
@@ -654,6 +687,7 @@ function start() {
           ? '<b class="tbig">' + esc(d.start ? d.start + (d.end ? '–' + d.end : '') : 'Session') + '</b><small>' + esc([partOfDay(d), d.location].filter(Boolean).join(' · '))
           : '<b>' + esc(day(d.date)) + '</b><small>' + esc([times(d), d.location].filter(Boolean).join(' · '))) +
         '</small><small>' + taken + ' of ' + d.seats + ' signed up</small>' +
+        (showSquads() && squadOff(d.date) ? '<small class="squadoff">Squad ' + esc(squadOff(d.date)) + ' is off</small>' : '') +
         (also && !seatHere ? '<small style="color:var(--wait);font-weight:700">You\'re in ' + esc(also) + ' that day.</small>' : '') + '</div>' + chip + '</div>' +
       '<div class="bar"><i style="width:' + Math.min(100, Math.round(taken / d.seats * 100)) + '%"></i></div>';
 
@@ -1159,6 +1193,7 @@ function start() {
     if (b.id === 'calclear') { calPick = {}; calDay = ''; render(); return; }
   });
   app.addEventListener('change', function (e) {
+    if (e.target.id === 'squadtog') { store.set('ci-class-squads', e.target.checked ? 'on' : 'off'); render(); return; }
     if (e.target.id !== 'sortsel') return;
     sortBy = e.target.value; store.set('ci-class-sort', sortBy); render();
   });
