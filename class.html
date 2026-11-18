@@ -152,7 +152,28 @@
   .calday.got { background: var(--okbg); color: var(--ok); }
   .calday.got i { color: var(--ok); }
   .calday.sel { outline: 2.5px solid var(--navy); outline-offset: -2.5px; }
-  .callegend { display: flex; gap: 14px; margin: 10px 2px 0; font-size: 12px; color: var(--muted); }
+  .calnav { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+  .calnav b { flex: 1; text-align: center; font-size: 16px; font-weight: 700; color: var(--navy); }
+  .calnav button { flex: none; width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid var(--line);
+    background: var(--card); color: var(--navy); font-size: 22px; line-height: 1; font-family: inherit; cursor: pointer; }
+  .calnav button:disabled { color: var(--line); cursor: default; }
+  .calday.pick { background: var(--navy); color: #fff; }
+  .calday.pick i { color: #fff; }
+  .calpickrow { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; margin: 0 0 8px;
+    padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); font: inherit; color: var(--ink); }
+  .calpickrow small { display: block; margin-top: 2px; font-size: 13px; color: var(--muted); font-weight: 400; }
+  .calpickrow span { flex: 1; font-weight: 700; }
+  .calpickrow em { flex: none; font-style: normal; font-size: 14px; font-weight: 700; color: var(--navy); }
+  .calpickrow.on { border-color: var(--navy); background: #E6EBF3; }
+  .calbar { background: var(--card); border: 1.5px solid var(--navy); border-radius: 16px; padding: 14px; margin: 0 0 14px; }
+  .calbar > b { display: block; font-size: 16px; color: var(--navy); }
+  .calbar ul { list-style: none; margin: 10px 0 12px; padding: 0; }
+  .calbar li { padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .calbar li span { display: block; font-size: 13px; color: var(--muted); font-weight: 700; }
+  .calbar li small { color: var(--wait); font-weight: 700; }
+  .calbar .link { display: block; width: 100%; margin-top: 8px; padding: 8px; border: 0; background: none;
+    color: var(--muted); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .callegend { display: flex; gap: 14px; margin: 10px 2px 0; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
   .callegend b { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
   .dtopic { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 2px; }
   .dtopic em { font-style: normal; font-size: 13px; font-weight: 700; padding: 2px 9px; border-radius: 6px; background: #E6EBF3; color: var(--navy); }
@@ -244,7 +265,9 @@ function start() {
   // In-Service: list the dates by topic (default) or all by date. Remembered on this phone.
   var SORTS = { topic: 'By topic', date: 'By date', cal: 'By calendar' };
   var sortBy = SORTS[store.get('ci-class-sort')] ? store.get('ci-class-sort') : 'topic';
-  var calDay = '';   // the day opened in the calendar view
+  var calDay = '';    // a day with several sessions, opened to choose one
+  var calMonth = '';  // the month on screen, 'YYYY-MM'
+  var calPick = {};   // dates chosen but not confirmed yet, by id
 
   var st = { cls: DATA.cls, today: DATA.today, done: DATA.done || [], me: null, matches: [], busy: '', confirm: '', confirmTimer: null };
 
@@ -462,13 +485,12 @@ function start() {
     }).join('') + '</ul>';
   }
 
-  // Every month that has a session, as a grid. A day with sessions is a
-  // button; the day you tap opens underneath with its usual cards, so
-  // signing up is the same here as anywhere else.
+  // One month at a time, with arrows. Six stacked calendars meant
+  // scrolling past five of them to reach December.
+  //
+  // Days are SELECTED here, not signed up for: tap as many as you want,
+  // check them over, then confirm the lot in one go.
   function calHtml(closed, busyDays) {
-    // Declared here, not at the top of the file: render() runs before the
-    // bottom of this module is reached, so a var up there is still
-    // undefined the first time the calendar draws.
     var CAL_MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     var CAL_DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     var c = st.cls;
@@ -477,41 +499,116 @@ function start() {
     });
     if (!shown.length) return '<p class="note">No upcoming dates.</p>';
 
-    var byDate = {}, mineDays = {};
+    var byDate = {}, mineDays = {}, byId = {};
     shown.forEach(function (d) {
       (byDate[d.date] = byDate[d.date] || []).push(d);
+      byId[d.id] = d;
       if (d['in'].some(isMe)) mineDays[d.date] = true;
     });
-    var keys = Object.keys(byDate).sort();
-    if (!byDate[calDay]) calDay = keys[0];
+    // Anything picked that has since gone (a refresh, someone else's
+    // change) quietly drops out.
+    Object.keys(calPick).forEach(function (id) { if (!byId[id]) delete calPick[id]; });
 
-    var y = +keys[0].slice(0, 4), m = +keys[0].slice(5, 7) - 1;
-    var last = keys[keys.length - 1], ey = +last.slice(0, 4), em = +last.slice(5, 7) - 1;
-    var html = '';
-    while (y < ey || (y === ey && m <= em)) {
-      html += '<div class="calwrap"><div class="calmon">' + CAL_MON[m] + ' ' + y + '</div><div class="calgrid">' +
-        CAL_DOW.map(function (x, i) { return '<span class="caldow" aria-hidden="true">' + x + '</span>'; }).join('');
-      var lead = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate();
-      for (var i = 0; i < lead; i++) html += '<span class="calday out"></span>';
-      for (var n = 1; n <= days; n++) {
-        var key = y + '-' + ('0' + (m + 1)).slice(-2) + '-' + ('0' + n).slice(-2);
-        var list = byDate[key];
-        if (!list) { html += '<span class="calday">' + n + '</span>'; continue; }
-        html += '<button type="button" data-calday="' + key + '" aria-label="' + esc(day(key)) + '"' +
-          ' class="calday has' + (mineDays[key] ? ' got' : '') + (calDay === key ? ' sel' : '') + '">' + n +
-          '<i>' + (mineDays[key] ? '\u2713' : list.length > 1 ? list.length : '\u00b7') + '</i></button>';
-      }
-      html += '</div><div class="callegend"><span><b style="background:#E6EBF3"></b>Has a class</span>' +
-        '<span><b style="background:var(--ok)"></b>You\'re booked</span></div></div>';
-      m++; if (m > 11) { m = 0; y++; }
+    var keys = Object.keys(byDate).sort();
+    var months = [];
+    keys.forEach(function (k) { var m = k.slice(0, 7); if (months.indexOf(m) < 0) months.push(m); });
+    if (months.indexOf(calMonth) < 0) {
+      // Open on the month holding the first date they haven't got yet.
+      var want = keys.filter(function (k) { return !mineDays[k]; })[0] || keys[0];
+      calMonth = want.slice(0, 7);
+    }
+    var mi = months.indexOf(calMonth);
+    var y = +calMonth.slice(0, 4), m = +calMonth.slice(5, 7) - 1;
+
+    var html = '<div class="calwrap"><div class="calnav">' +
+      '<button type="button" id="calprev" aria-label="Previous month"' + (mi <= 0 ? ' disabled' : '') + '>&#8249;</button>' +
+      '<b>' + CAL_MON[m] + ' ' + y + '</b>' +
+      '<button type="button" id="calnext" aria-label="Next month"' + (mi >= months.length - 1 ? ' disabled' : '') + '>&#8250;</button>' +
+      '</div><div class="calgrid">' +
+      CAL_DOW.map(function (x) { return '<span class="caldow" aria-hidden="true">' + x + '</span>'; }).join('');
+
+    var lead = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate();
+    for (var i = 0; i < lead; i++) html += '<span class="calday out"></span>';
+    for (var n = 1; n <= days; n++) {
+      var key = y + '-' + ('0' + (m + 1)).slice(-2) + '-' + ('0' + n).slice(-2);
+      var list = byDate[key];
+      if (!list) { html += '<span class="calday">' + n + '</span>'; continue; }
+      var picked = list.some(function (d) { return calPick[d.id]; });
+      var mark = picked ? '\u2713' : mineDays[key] ? '\u2713' : list.length > 1 ? list.length : '\u00b7';
+      html += '<button type="button" data-calday="' + key + '" aria-pressed="' + picked + '" aria-label="' + esc(day(key)) + '"' +
+        ' class="calday has' + (mineDays[key] ? ' got' : '') + (picked ? ' pick' : '') + (calDay === key ? ' sel' : '') + '">' +
+        n + '<i>' + mark + '</i></button>';
+    }
+    html += '</div><div class="callegend">' +
+      '<span><b style="background:#E6EBF3"></b>Has a class</span>' +
+      '<span><b style="background:var(--ok)"></b>Booked</span>' +
+      '<span><b style="background:var(--navy)"></b>Picked</span></div></div>';
+
+    // A day with more than one session: open it so the right one can be
+    // chosen rather than guessed.
+    if (calDay && byDate[calDay] && byDate[calDay].length > 1) {
+      html += '<h3 class="topic">' + esc(day(calDay)) + '</h3>' +
+        byDate[calDay].map(function (d) {
+          return '<button type="button" class="calpickrow' + (calPick[d.id] ? ' on' : '') + '" data-calsel="' + d.id + '">' +
+            '<span>' + (isIS() ? esc(d.topic) : esc(times(d) || 'Session')) + '<small>' + esc(times(d)) + ' \u00b7 ' +
+            ((d.seats - d['in'].length) > 0 ? (d.seats - d['in'].length) + ' seats left' : 'Full') + '</small></span>' +
+            '<em>' + (calPick[d.id] ? 'Picked' : 'Pick') + '</em></button>';
+        }).join('');
     }
 
-    html += '<h3 class="topic">' + esc(day(calDay)) + '</h3>' +
-      byDay(byDate[calDay], function (d, timeFirst) {
-        var g = isIS() ? d.topic : '';
-        return dateCard(d, myStatus(g), closed, busyDays[d.date] && busyDays[d.date] !== g ? busyDays[d.date] : '', isIS(), timeFirst);
-      });
+    // What they've chosen, and the one button that does it.
+    var picks = Object.keys(calPick).map(function (id) { return byId[id]; })
+      .sort(function (a, b) { return a.date.localeCompare(b.date); });
+    if (picks.length) {
+      html += '<div class="calbar"><b>' + picks.length + (picks.length === 1 ? ' date picked' : ' dates picked') + '</b><ul>' +
+        picks.map(function (d) {
+          var was = isIS() ? myStatus(d.topic).seat : myStatus('').seat;
+          return '<li>' + (isIS() ? '<span>' + esc(d.topic) + '</span>' : '') + esc(day(d.date)) +
+            (was && was !== d ? ' <small>replaces ' + esc(shortDay(was.date)) + '</small>' : '') + '</li>';
+        }).join('') + '</ul>' +
+        (closed ? '<p class="note">' + esc(closed) + '</p>'
+          : '<button type="button" class="btn" id="calgo">Sign up for ' + (picks.length === 1 ? 'this date' : 'these ' + picks.length + ' dates') + '</button>') +
+        '<button type="button" class="link" id="calclear">Clear</button></div>';
+    } else if (!closed) {
+      html += '<p class="note">Tap the days you want, then confirm them together.</p>';
+    }
     return html;
+  }
+
+  // Tapping a day. One session that day: pick it. More than one: open
+  // the day so they can say which. In-Service allows one date per topic,
+  // so picking a second date for a topic replaces the first.
+  function calTap(key) {
+    var list = st.cls.dates.filter(function (d) {
+      return d.date === key && (d.date >= st.today || myStatus(isIS() ? d.topic : '').seat === d);
+    });
+    if (!list.length) return;
+    if (list.length > 1) { calDay = calDay === key ? '' : key; return; }
+    calPickOne(list[0]);
+  }
+
+  function calPickOne(d) {
+    if (calPick[d.id]) { delete calPick[d.id]; return; }
+    if (isIS()) {
+      // Only one date per topic can be waiting to be confirmed.
+      Object.keys(calPick).forEach(function (id) {
+        var x = st.cls.dates.filter(function (y) { return y.id === id; })[0];
+        if (x && x.topic === d.topic) delete calPick[id];
+      });
+    }
+    calPick[d.id] = true;
+  }
+
+  function calConfirm() {
+    var ids = Object.keys(calPick);
+    if (!ids.length) return;
+    if (doneMe()) { toast('You\'ve already completed this training.', true); return; }
+    if (!st.pin && !myPass()) { st.pinAfter = null; pinAsk(hasPin() ? 'need' : 'new', '', { op: 'calgo', d: '' }); return; }
+    st.switchOk = true;
+    ids.forEach(function (id) { send('join', id); });
+    st.switchOk = false;
+    calPick = {}; calDay = '';
+    render();
   }
 
   function clock(d) { return ('0' + d.getHours()).slice(-2) + ('0' + d.getMinutes()).slice(-2); }
@@ -1011,7 +1108,8 @@ function start() {
     } else if (!/^\d{4}$/.test(p1)) { err.textContent = 'Enter your 4-number PIN.'; return; }
     st.pin = p1;
     $('pinov').hidden = true;
-    if (st.pinAfter) send(st.pinAfter.op, st.pinAfter.d);
+    if (st.pinAfter && st.pinAfter.op === 'calgo') calConfirm();
+    else if (st.pinAfter) send(st.pinAfter.op, st.pinAfter.d);
     st.pinAfter = null;
   }
 
@@ -1046,7 +1144,19 @@ function start() {
     if (b.id === 'refresh') { refresh(false); return; }
     if (b.id === 'forget') { savePass(''); st.pin = ''; render(); toast('This phone forgot your PIN.'); return; }
     if (b.dataset.op) { act(b.dataset.op, b.dataset.d); return; }
-    if (b.dataset.calday) { calDay = b.dataset.calday; render(); return; }
+    if (b.dataset.calday) { calTap(b.dataset.calday); render(); return; }
+    if (b.dataset.calsel) {
+      var dsel = st.cls.dates.filter(function (x) { return x.id === b.dataset.calsel; })[0];
+      if (dsel) { calPickOne(dsel); render(); }
+      return;
+    }
+    if (b.id === 'calprev' || b.id === 'calnext') {
+      var ym = calMonth.split('-'), yy = +ym[0], mm = +ym[1] - 1 + (b.id === 'calnext' ? 1 : -1);
+      if (mm < 0) { mm = 11; yy--; } else if (mm > 11) { mm = 0; yy++; }
+      calMonth = yy + '-' + ('0' + (mm + 1)).slice(-2); calDay = ''; render(); return;
+    }
+    if (b.id === 'calgo') { calConfirm(); return; }
+    if (b.id === 'calclear') { calPick = {}; calDay = ''; render(); return; }
   });
   app.addEventListener('change', function (e) {
     if (e.target.id !== 'sortsel') return;
