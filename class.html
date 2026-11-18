@@ -106,6 +106,18 @@
   .donote { flex: 1 1 100%; font-size: 14px; color: var(--muted); }
   .foot { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; margin-top: 4px; }
 
+  /* The topics as a list you can read, rather than a sentence with five
+     long names run together in it. Doubles as the progress tracker. */
+  .tlist { list-style: none; margin: 12px 0 0; padding: 0; border-top: 1px solid var(--line); }
+  .tlist li { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .tmark { flex: none; width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--line); background: var(--card);
+    display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; }
+  .tlist li.got .tmark { background: var(--ok); border-color: var(--ok); }
+  .tname { flex: 1 1 auto; line-height: 1.3; }
+  .tlist li.got .tname { color: var(--muted); }
+  .twhen { flex: none; font-size: 13px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+    background: var(--waitbg); color: var(--wait); }
+  .tlist li.got .twhen { background: var(--okbg); color: var(--ok); }
   .topic { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 18px 2px 10px; font-size: 19px; color: var(--navy); }
   .topic span { font-size: 13px; padding: 3px 10px; border-radius: 999px; }
   .topic span.ok { background: var(--okbg); color: var(--ok); }
@@ -338,7 +350,7 @@ function start() {
         (c.category ? '<span class="cat">' + esc(c.category) + '</span>' : '') +
         (c.notes ? '<p class="notes">' + esc(c.notes) + '</p>' : '') +
         (hasRp() ? '<p class="meta"><b>Role players wanted.</b> Anyone can sign up as a role player, even if you\'ve already taken this training.</p>' : '') +
-        (isIS() ? '<p class="meta">Pick one date for each topic: ' + esc(groups.join(', ')) + '. You can come back and finish later.</p>' : '') +
+        (isIS() ? '<p class="meta">Pick one date for each topic. You can come back and finish later.</p>' + topicList(groups) : '') +
         (c.deadline && !closed ? '<p class="meta"><b>Sign up by ' + esc(day(c.deadline)) + '.</b></p>' : '') +
       '</div>';
     if (closed) html += '<div class="banner closed">' + esc(closed) + '</div>';
@@ -347,10 +359,13 @@ function start() {
 
     if (st.me && isIS()) {
       var left = groups.filter(function (g) { return !myStatus(g).seat; });
+      // The checklist at the top says which ones are left, so this says
+      // how far along they are and nothing more.
       html += left.length
-        ? '<div class="banner ' + (left.length < groups.length ? 'mine' : 'none') + '">You have ' + (groups.length - left.length) + ' of ' + groups.length +
-            ' topics. Still need: ' + esc(left.join(', ')) + '.</div>'
-        : '<div class="banner mine">You have all ' + groups.length + ' topics. You\'re done!</div>';
+        ? '<div class="banner ' + (left.length < groups.length ? 'mine' : 'none') + '">' +
+            (groups.length - left.length) + ' of ' + groups.length + ' topics booked. ' +
+            (left.length === 1 ? 'One to go.' : left.length + ' to go.') + '</div>'
+        : '<div class="banner mine">All ' + groups.length + ' topics booked. You\'re done!</div>';
     } else if (st.me && doneMe()) {
       html += '<div class="banner none">You\'ve already completed this training, so you can\'t sign up to attend. You can sign up as a <b>role player</b> on any date below.</div>';
     } else if (st.me) {
@@ -404,6 +419,20 @@ function start() {
     html += '<div class="foot"><span>Updated ' + esc(clock(new Date())) + '</span><button type="button" class="link" id="refresh">Refresh</button></div>';
     app.innerHTML = html;
     drawWho();
+  }
+
+  // Every topic on its own line, ticked once they have a date for it.
+  // Before anyone says who they are it's just the list of topics.
+  function topicList(groups) {
+    return '<ul class="tlist">' + groups.map(function (g) {
+      var m = st.me ? myStatus(g) : null;
+      var got = !!(m && m.seat);
+      return '<li' + (got ? ' class="got"' : '') + '>' +
+        '<span class="tmark" aria-hidden="true">' + (got ? '\u2713' : '') + '</span>' +
+        '<span class="tname">' + esc(g) + '</span>' +
+        (m ? '<span class="twhen">' + (got ? esc(shortDay(m.seat.date)) : m.wait ? 'Waitlisted' : 'Not picked') + '</span>' : '') +
+        '</li>';
+    }).join('') + '</ul>';
   }
 
   function clock(d) { return ('0' + d.getHours()).slice(-2) + ('0' + d.getMinutes()).slice(-2); }
