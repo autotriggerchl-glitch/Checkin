@@ -17,4 +17,4 @@ var APP_URL = 'https://script.google.com/macros/s/AKfycbxH6lVXqyFvjSkERa3TkG77op
 // roster you have in front of you before trusting it. While anchor is
 // blank the squad labels are simply not shown.
 // ---------------------------------------------------------------------
-var SQUAD_ROTATION = { anchor: '', letter: 'A', on: 4, off: 4, squads: ['A', 'B'] };
+var SQUAD_ROTATION = { anchor: '2026-11-17', letter: 'A', on: 4, off: 4, squads: ['A', 'B'] };

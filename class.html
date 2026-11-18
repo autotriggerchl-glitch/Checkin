@@ -168,6 +168,9 @@
   .calpickrow span { flex: 1; font-weight: 700; }
   .calpickrow em { flex: none; font-style: normal; font-size: 14px; font-weight: 700; color: var(--navy); }
   .calpickrow.on { border-color: var(--navy); background: #E6EBF3; }
+  .calpickrow.mine { border-color: var(--ok); background: var(--okbg); }
+  .calpickrow.mine em { color: var(--ok); }
+  .calwho { color: var(--navy) !important; font-weight: 600 !important; }
   .calbar { background: var(--card); border: 1.5px solid var(--navy); border-radius: 16px; padding: 14px; margin: 0 0 14px; }
   .calbar > b { display: block; font-size: 16px; color: var(--navy); }
   .calbar ul { list-style: none; margin: 10px 0 12px; padding: 0; }
@@ -594,15 +597,23 @@ function start() {
       '<span><b style="background:var(--navy)"></b>Picked</span>' +
       (showSquads() ? '<span>A-off / B-off \u2014 the squad that\'s off</span>' : '') + '</div></div>';
 
-    // A day with more than one session: open it so the right one can be
-    // chosen rather than guessed.
-    if (calDay && byDate[calDay] && byDate[calDay].length > 1) {
-      html += '<h3 class="topic">' + esc(day(calDay)) + '</h3>' +
+    // The day you tapped opens underneath: what's on it, who has already
+    // signed up, and whether you've picked it. Picking a day shouldn't
+    // mean giving up the one thing people check first.
+    if (calDay && byDate[calDay]) {
+      html += '<h3 class="topic">' + esc(day(calDay)) +
+        (showSquads() && squadOff(calDay) ? '<span class="need">Squad ' + esc(squadOff(calDay)) + ' off</span>' : '') + '</h3>' +
         byDate[calDay].map(function (d) {
-          return '<button type="button" class="calpickrow' + (calPick[d.id] ? ' on' : '') + '" data-calsel="' + d.id + '">' +
-            '<span>' + (isIS() ? esc(d.topic) : esc(times(d) || 'Session')) + '<small>' + esc(times(d)) + ' \u00b7 ' +
-            ((d.seats - d['in'].length) > 0 ? (d.seats - d['in'].length) + ' seats left' : 'Full') + '</small></span>' +
-            '<em>' + (calPick[d.id] ? 'Picked' : 'Pick') + '</em></button>';
+          var left = d.seats - d['in'].length, mineHere = d['in'].some(isMe);
+          var who = d['in'].length
+            ? d['in'].map(function (x) { return esc(x.n) + (isMe(x) ? ' (you)' : ''); }).join(', ')
+            : 'No one yet';
+          return '<button type="button" class="calpickrow' + (calPick[d.id] ? ' on' : '') + (mineHere ? ' mine' : '') +
+            '" data-calsel="' + d.id + '"><span>' +
+            (isIS() ? esc(d.topic) : esc(day(d.date))) +
+            '<small>' + esc(times(d)) + ' \u00b7 ' + (left > 0 ? left + (left === 1 ? ' seat left' : ' seats left') : 'Full' + (d.wait.length ? ' \u00b7 ' + d.wait.length + ' waiting' : '')) + '</small>' +
+            '<small class="calwho">' + who + '</small></span>' +
+            '<em>' + (mineHere ? '\u2713 Booked' : calPick[d.id] ? 'Picked' : 'Pick') + '</em></button>';
         }).join('');
     }
 
@@ -633,8 +644,8 @@ function start() {
       return d.date === key && (d.date >= st.today || myStatus(isIS() ? d.topic : '').seat === d);
     });
     if (!list.length) return;
-    if (list.length > 1) { calDay = calDay === key ? '' : key; return; }
-    calPickOne(list[0]);
+    calDay = key;                       // always open it, so they can see who's on
+    if (list.length === 1) calPickOne(list[0]);
   }
 
   function calPickOne(d) {
