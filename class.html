@@ -660,6 +660,56 @@ function start() {
     calPick[d.id] = true;
   }
 
+  // "A, B and C"
+  function andList(a) {
+    return a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+  }
+
+  // The topics they'd STILL be missing once the picked dates go through.
+  function calMissingAfter() {
+    if (!isIS()) return [];
+    var picked = Object.keys(calPick).map(function (id) {
+      return st.cls.dates.filter(function (x) { return x.id === id; })[0];
+    }).filter(Boolean);
+    return (st.cls.topics || []).filter(function (g) {
+      if (myStatus(g).seat) return false;
+      return !picked.some(function (d) { return d.topic === g; });
+    });
+  }
+
+  // Signing up is the moment to say what's left, because it's the moment
+  // they think they've finished. Nobody reads a count at the top of a
+  // page they're scrolling past.
+  function calAsk() {
+    if (!Object.keys(calPick).length) return;
+    if (!isIS()) { calConfirm(); return; }
+    var n = Object.keys(calPick).length, left = calMissingAfter();
+    var ov = $('calov');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'calov'; ov.className = 'pinov';
+      ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'cal-t');
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('button');
+        if (e.target === ov || (b && b.id === 'cal-keep')) { ov.hidden = true; return; }
+        if (b && b.id === 'cal-go') { ov.hidden = true; calConfirm(); }
+      });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !ov.hidden) ov.hidden = true; });
+    }
+    var until = st.cls.deadline ? ' until <b>' + esc(day(st.cls.deadline)) + '</b>' : '';
+    ov.innerHTML = '<div class="pincard">' +
+      '<h2 class="pint" id="cal-t">Sign up for ' + (n === 1 ? 'this date' : 'these ' + n + ' dates') + '?</h2>' +
+      (left.length
+        ? '<p class="note" style="margin:0">You\'d still need <b>' + esc(andList(left)) + '</b>.</p>' +
+          '<p class="note" style="margin:10px 0 0">You don\'t have to do it all now \u2014 you can come back and pick the rest any time' + until + '.</p>'
+        : '<p class="note" style="margin:0">That\'s <b>all ' + (st.cls.topics || []).length + ' topics</b>. When you\'re finished, tap <b>Done</b> and we\'ll email you the list.</p>') +
+      '<div class="pinbtns"><button type="button" class="btn ghost" id="cal-keep">Keep picking</button>' +
+        '<button type="button" class="btn" id="cal-go">Sign up</button></div></div>';
+    ov.hidden = false;
+    setTimeout(function () { var k = $('cal-go'); if (k) k.focus(); }, 50);
+  }
+
   function calConfirm() {
     var ids = Object.keys(calPick);
     if (!ids.length) return;
@@ -1217,7 +1267,7 @@ function start() {
       if (mm < 0) { mm = 11; yy--; } else if (mm > 11) { mm = 0; yy++; }
       calMonth = yy + '-' + ('0' + (mm + 1)).slice(-2); calDay = ''; render(); return;
     }
-    if (b.id === 'calgo') { calConfirm(); return; }
+    if (b.id === 'calgo') { calAsk(); return; }
     if (b.id === 'calclear') { calPick = {}; calDay = ''; render(); return; }
   });
   app.addEventListener('change', function (e) {
