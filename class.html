@@ -133,9 +133,27 @@
   .pinf input[type=password] { letter-spacing: 8px; font-weight: 700; }
   .pin-err { color: var(--err); font-weight: 600; min-height: 1.3em; margin: 10px 0 0; font-size: 15px; }
   .pinbtns { display: flex; gap: 10px; margin-top: 12px; }
-  .sortbar { display: flex; gap: 4px; margin: 0 0 12px; padding: 4px; border-radius: 12px; background: #E1E7F0; }
-  .sortbar button { flex: 1; min-height: 42px; border: 0; border-radius: 9px; background: none; color: var(--muted); font-size: 15px; font-weight: 700; cursor: pointer; }
-  .sortbar button.on { background: #fff; color: var(--navy); box-shadow: 0 1px 4px rgba(19, 33, 58, .15); }
+  .viewpick { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+  .viewpick span { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; flex: none; }
+  .viewpick select { flex: 1; min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1.5px solid var(--line);
+    background: var(--card); color: var(--ink); font: inherit; font-size: 16px; font-weight: 600; }
+  /* Month grid. Only days with a session are tappable; tapping one opens
+     that day underneath, so signing up works exactly as it does in the
+     other two views. */
+  .calwrap { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px; margin: 0 0 12px; }
+  .calmon { font-size: 15px; font-weight: 700; color: var(--navy); margin: 2px 2px 10px; }
+  .calgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .caldow { text-align: center; font-size: 11px; font-weight: 700; color: var(--muted); padding-bottom: 4px; }
+  .calday { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-height: 44px; border: 0; border-radius: 10px; background: none; color: var(--muted); font: inherit; font-size: 14px; }
+  .calday.out { visibility: hidden; }
+  .calday.has { background: #E6EBF3; color: var(--navy); font-weight: 700; cursor: pointer; }
+  .calday i { font-style: normal; font-size: 10px; font-weight: 700; color: var(--muted); }
+  .calday.got { background: var(--okbg); color: var(--ok); }
+  .calday.got i { color: var(--ok); }
+  .calday.sel { outline: 2.5px solid var(--navy); outline-offset: -2.5px; }
+  .callegend { display: flex; gap: 14px; margin: 10px 2px 0; font-size: 12px; color: var(--muted); }
+  .callegend b { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
   .dtopic { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 2px; }
   .dtopic em { font-style: normal; font-size: 13px; font-weight: 700; padding: 2px 9px; border-radius: 6px; background: #E6EBF3; color: var(--navy); }
   .dtopic .have { font-size: 13px; font-weight: 700; color: var(--ok); }
@@ -224,7 +242,9 @@ function start() {
   if (!device) { device = String(Date.now()) + Math.random().toString(36).slice(2, 10); store.set('ci-device', device); }
   var meKey = 'ci-class-me-' + DATA.c;
   // In-Service: list the dates by topic (default) or all by date. Remembered on this phone.
-  var sortBy = store.get('ci-class-sort') === 'date' ? 'date' : 'topic';
+  var SORTS = { topic: 'By topic', date: 'By date', cal: 'By calendar' };
+  var sortBy = SORTS[store.get('ci-class-sort')] ? store.get('ci-class-sort') : 'topic';
+  var calDay = '';   // the day opened in the calendar view
 
   var st = { cls: DATA.cls, today: DATA.today, done: DATA.done || [], me: null, matches: [], busy: '', confirm: '', confirmTimer: null };
 
@@ -388,12 +408,19 @@ function start() {
     // Days this officer already has, by topic (for "you're in X that day").
     var busyDays = {};
     if (isIS() && st.me) c.dates.forEach(function (d) { if (d['in'].some(isMe)) busyDays[d.date] = d.topic; });
-    if (isIS()) {
-      html += '<div class="sortbar" role="group" aria-label="Show dates">' +
-        '<button type="button" data-sort="topic" class="' + (sortBy === 'topic' ? 'on' : '') + '" aria-pressed="' + (sortBy === 'topic') + '">By topic</button>' +
-        '<button type="button" data-sort="date" class="' + (sortBy === 'date' ? 'on' : '') + '" aria-pressed="' + (sortBy === 'date') + '">By date</button></div>';
-    }
-    if (isIS() && sortBy === 'date') {
+    // A class with a handful of dates doesn't need a view picker; one
+    // with a hundred and twenty does.
+    var canPick = isIS() || c.dates.length > 2;
+    if (canPick) {
+      if (!isIS() && sortBy === 'topic') sortBy = 'date';
+      html += '<div class="viewpick"><span>Show</span><select id="sortsel" aria-label="How to show the dates">' +
+        Object.keys(SORTS).filter(function (k) { return isIS() || k !== 'topic'; }).map(function (k) {
+          return '<option value="' + k + '"' + (sortBy === k ? ' selected' : '') + '>' + SORTS[k] + '</option>';
+        }).join('') + '</select></div>';
+    } else if (sortBy === 'cal') sortBy = isIS() ? 'topic' : 'date';
+    if (sortBy === 'cal') {
+      html += calHtml(closed, busyDays);
+    } else if (isIS() && sortBy === 'date') {
       // Every date in order, each showing its topic.
       var all = c.dates.filter(function (d) { return d.date >= st.today || myStatus(d.topic).seat === d; })
         .slice().sort(function (a, b) { return (a.date + (a.start || '')).localeCompare(b.date + (b.start || '')); });
@@ -433,6 +460,58 @@ function start() {
         (m ? '<span class="twhen">' + (got ? esc(shortDay(m.seat.date)) : m.wait ? 'Waitlisted' : 'Not picked') + '</span>' : '') +
         '</li>';
     }).join('') + '</ul>';
+  }
+
+  // Every month that has a session, as a grid. A day with sessions is a
+  // button; the day you tap opens underneath with its usual cards, so
+  // signing up is the same here as anywhere else.
+  function calHtml(closed, busyDays) {
+    // Declared here, not at the top of the file: render() runs before the
+    // bottom of this module is reached, so a var up there is still
+    // undefined the first time the calendar draws.
+    var CAL_MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    var CAL_DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    var c = st.cls;
+    var shown = c.dates.filter(function (d) {
+      return d.date >= st.today || myStatus(isIS() ? d.topic : '').seat === d;
+    });
+    if (!shown.length) return '<p class="note">No upcoming dates.</p>';
+
+    var byDate = {}, mineDays = {};
+    shown.forEach(function (d) {
+      (byDate[d.date] = byDate[d.date] || []).push(d);
+      if (d['in'].some(isMe)) mineDays[d.date] = true;
+    });
+    var keys = Object.keys(byDate).sort();
+    if (!byDate[calDay]) calDay = keys[0];
+
+    var y = +keys[0].slice(0, 4), m = +keys[0].slice(5, 7) - 1;
+    var last = keys[keys.length - 1], ey = +last.slice(0, 4), em = +last.slice(5, 7) - 1;
+    var html = '';
+    while (y < ey || (y === ey && m <= em)) {
+      html += '<div class="calwrap"><div class="calmon">' + CAL_MON[m] + ' ' + y + '</div><div class="calgrid">' +
+        CAL_DOW.map(function (x, i) { return '<span class="caldow" aria-hidden="true">' + x + '</span>'; }).join('');
+      var lead = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate();
+      for (var i = 0; i < lead; i++) html += '<span class="calday out"></span>';
+      for (var n = 1; n <= days; n++) {
+        var key = y + '-' + ('0' + (m + 1)).slice(-2) + '-' + ('0' + n).slice(-2);
+        var list = byDate[key];
+        if (!list) { html += '<span class="calday">' + n + '</span>'; continue; }
+        html += '<button type="button" data-calday="' + key + '" aria-label="' + esc(day(key)) + '"' +
+          ' class="calday has' + (mineDays[key] ? ' got' : '') + (calDay === key ? ' sel' : '') + '">' + n +
+          '<i>' + (mineDays[key] ? '\u2713' : list.length > 1 ? list.length : '\u00b7') + '</i></button>';
+      }
+      html += '</div><div class="callegend"><span><b style="background:#E6EBF3"></b>Has a class</span>' +
+        '<span><b style="background:var(--ok)"></b>You\'re booked</span></div></div>';
+      m++; if (m > 11) { m = 0; y++; }
+    }
+
+    html += '<h3 class="topic">' + esc(day(calDay)) + '</h3>' +
+      byDay(byDate[calDay], function (d, timeFirst) {
+        var g = isIS() ? d.topic : '';
+        return dateCard(d, myStatus(g), closed, busyDays[d.date] && busyDays[d.date] !== g ? busyDays[d.date] : '', isIS(), timeFirst);
+      });
+    return html;
   }
 
   function clock(d) { return ('0' + d.getHours()).slice(-2) + ('0' + d.getMinutes()).slice(-2); }
@@ -967,7 +1046,11 @@ function start() {
     if (b.id === 'refresh') { refresh(false); return; }
     if (b.id === 'forget') { savePass(''); st.pin = ''; render(); toast('This phone forgot your PIN.'); return; }
     if (b.dataset.op) { act(b.dataset.op, b.dataset.d); return; }
-    if (b.dataset.sort) { sortBy = b.dataset.sort; store.set('ci-class-sort', sortBy); render(); return; }
+    if (b.dataset.calday) { calDay = b.dataset.calday; render(); return; }
+  });
+  app.addEventListener('change', function (e) {
+    if (e.target.id !== 'sortsel') return;
+    sortBy = e.target.value; store.set('ci-class-sort', sortBy); render();
   });
   app.addEventListener('input', function (e) { if (e.target.id === 'q') drawDrop(); });
   app.addEventListener('keydown', function (e) {
