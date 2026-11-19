@@ -22,7 +22,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-18b';
+var PAGE_VERSION = '2026-11-19a';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -214,6 +214,17 @@ var PAGE_VERSION = '2026-11-18b';
   .pinconf .btn { flex: 1; min-height: 44px; font-size: 15px; }
   .pin-err { color: var(--err); font-weight: 600; min-height: 1.3em; margin: 10px 0 0; font-size: 15px; }
   .pinbtns { display: flex; gap: 10px; margin-top: 12px; }
+  .ctrls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: 0 0 12px; }
+  .ctrls .viewpick { flex: 1 1 210px; margin: 0; }
+  .ctrls .squadtog { flex: 0 1 auto; margin: 0; }
+  .sect { display: flex; align-items: baseline; gap: 10px; margin: 18px 2px 10px; }
+  .sect .tally { flex: none; margin-left: auto; font-style: normal; font-size: 12px; font-weight: 700;
+    letter-spacing: 0; text-transform: none; color: var(--wait); background: var(--waitbg);
+    border-radius: 999px; padding: 3px 10px; }
+  .sect .tally.done { color: var(--ok); background: var(--okbg); }
+  .whoslim { padding: 10px 12px; }
+  .whoslim .picked { min-height: 48px; border-width: 1px; }
+  .whoslim .note { font-size: 13px; }
   .viewpick { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
   .viewpick span { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; flex: none; }
   .viewpick select { flex: 1; min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1.5px solid var(--line);
@@ -233,6 +244,45 @@ var PAGE_VERSION = '2026-11-18b';
   .calday.got { background: var(--okbg); color: var(--ok); }
   .calday.got i { color: var(--ok); }
   .calday.sel { outline: 2.5px solid var(--navy); outline-offset: -2.5px; }
+  /* ---- The grid: topics down the side, weeks across the top ---- */
+  .gwrap { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 10px 10px 0;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .gtable { display: grid; grid-template-columns: 132px repeat(var(--gcols), 108px); gap: 6px; width: max-content; }
+  /* The topic column holds still while the weeks scroll past. The shadow
+     paints over the column gap so nothing slides through it. */
+  .gstick { position: sticky; left: 0; z-index: 2; background: var(--card); padding-left: 10px;
+    box-shadow: 6px 0 0 0 var(--card), 11px 0 8px -8px rgba(19, 33, 58, .2); }
+  .gcorner { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .04em; display: flex; align-items: flex-end; padding: 0 6px 6px 10px; }
+  .ghead { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px 6px;
+    font-size: 13px; font-weight: 700; color: var(--navy); text-align: center; }
+  .ghead small { font-size: 11px; font-weight: 600; color: var(--muted); }
+  .ghead button { margin-top: 2px; border: 1.5px solid var(--line); background: var(--card); color: var(--focus);
+    border-radius: 999px; font: inherit; font-size: 11px; font-weight: 700; padding: 2px 8px; cursor: pointer; }
+  .ghead button:disabled { color: var(--line); border-color: #EDF1F7; cursor: default; }
+  .grow { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 6px 8px 6px 10px;
+    border-right: 1px solid var(--line); }
+  .grow b { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.2; }
+  .grow small { font-size: 11px; font-weight: 700; color: var(--wait); }
+  .grow small.on { color: var(--ok); }
+  .gcell { min-height: 56px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--card);
+    color: var(--ink); font: inherit; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px; padding: 4px 2px; cursor: pointer; text-align: center; }
+  .gcell b { font-size: 13px; font-weight: 700; }
+  .gcell small { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .gcell i { font-style: normal; font-size: 10px; font-weight: 700; color: var(--navy); }
+  .gcell.got { background: var(--okbg); border-color: var(--ok); }
+  .gcell.got small, .gcell.got b { color: var(--ok); }
+  .gcell.pick { background: var(--navy); border-color: var(--navy); }
+  .gcell.pick b, .gcell.pick small, .gcell.pick i { color: #fff; }
+  .gcell.full { background: #F3F5F9; color: var(--muted); }
+  .gcell.full small { color: var(--err); }
+  .gcell.sel { outline: 2.5px solid var(--focus); outline-offset: -3px; }
+  .gcell.none { border-style: dashed; border-color: #E6EBF3; cursor: default; }
+  .glegend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 10px 2px 0; font-size: 12px; color: var(--muted); }
+  .glegend span { display: flex; align-items: center; gap: 5px; }
+  .glegend b { width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--line); }
+  .ghint { margin: 8px 2px 0; font-size: 13px; color: var(--muted); }
   .squadtog { display: flex; align-items: center; gap: 9px; margin: -4px 2px 12px; font-size: 15px; color: var(--muted); }
   .squadtog input { width: 20px; height: 20px; accent-color: var(--navy); }
   .squadoff { color: var(--navy) !important; font-weight: 700 !important; }
@@ -350,11 +400,12 @@ function start() {
   if (!device) { device = String(Date.now()) + Math.random().toString(36).slice(2, 10); store.set('ci-device', device); }
   var meKey = 'ci-class-me-' + DATA.c;
   // In-Service: list the dates by topic (default) or all by date. Remembered on this phone.
-  var SORTS = { topic: 'By topic', date: 'By date', cal: 'By calendar' };
-  var sortBy = SORTS[store.get('ci-class-sort')] ? store.get('ci-class-sort') : 'topic';
+  var SORTS = { grid: 'Grid', topic: 'By topic', date: 'By date', cal: 'By calendar' };
+  var sortBy = SORTS[store.get('ci-class-sort')] ? store.get('ci-class-sort') : '';
   var calDay = '';    // a day with several sessions, opened to choose one
   var calMonth = '';  // the month on screen, 'YYYY-MM'
   var calPick = {};   // dates chosen but not confirmed yet, by id
+  var gridOpen = '';  // the grid cell opened underneath, by date id
 
   var st = { cls: DATA.cls, today: DATA.today, done: DATA.done || [], me: null, matches: [], busy: '', confirm: '', confirmTimer: null };
 
@@ -516,6 +567,11 @@ function start() {
     var c = st.cls;
     var closed = closedReason();
     var groups = isIS() ? (c.topics || []) : [''];
+    // Settle the view first: the grid carries its own checklist, so the
+    // page above it can be much shorter.
+    if (!sortBy) sortBy = isIS() && gridPlan() ? 'grid' : 'date';
+    if (sortBy === 'grid' && !(isIS() && gridPlan())) sortBy = isIS() ? 'topic' : 'date';
+    var onGrid = sortBy === 'grid' && isIS();
     var mine = myStatus(groups[0]);
     var html =
       '<div class="card"><h1 class="title">' + esc(c.title) + '</h1>' +
@@ -523,22 +579,25 @@ function start() {
         (c.category ? '<span class="cat">' + esc(c.category) + '</span>' : '') +
         (c.notes ? '<p class="notes">' + esc(c.notes) + '</p>' : '') +
         (hasRp() ? '<p class="meta"><b>Role players wanted.</b> Anyone can sign up as a role player, even if you\'ve already taken this training.</p>' : '') +
-        (isIS() ? '<p class="meta">Pick one date for each topic. You can come back and finish later.</p>' + topicList(groups) : '') +
+        (isIS() ? '<p class="meta">Pick one date for each topic' + (onGrid ? '. The grid below shows every week at once' : '') +
+          '. You can come back and finish later.</p>' : '') +
+        (isIS() && !onGrid ? topicList(groups) : '') +
         (c.deadline && !closed ? '<p class="meta"><b>Sign up by ' + esc(day(c.deadline)) + '.</b></p>' : '') +
       '</div>';
     if (closed) html += '<div class="banner closed">' + esc(closed) + '</div>';
 
-    html += '<div class="card"><h2><i>1</i> &nbsp;Who are you?</h2><div id="who"></div></div>';
+    html += st.me
+      ? '<div class="card whoslim"><div id="who"></div></div>'
+      : '<div class="card"><h2><i>1</i> &nbsp;Who are you?</h2><div id="who"></div></div>';
 
     if (st.me && isIS()) {
       var left = groups.filter(function (g) { return !myStatus(g).seat; });
       // The checklist at the top says which ones are left, so this says
       // how far along they are and nothing more.
-      html += left.length
-        ? '<div class="banner ' + (left.length < groups.length ? 'mine' : 'none') + '">' +
-            (groups.length - left.length) + ' of ' + groups.length + ' topics booked. ' +
-            (left.length === 1 ? 'One to go.' : left.length + ' to go.') + '</div>'
-        : '<div class="banner mine">All ' + groups.length + ' topics booked. You\'re done!</div>';
+      if (!left.length) html += '<div class="banner mine">All ' + groups.length + ' topics booked. You\'re done!</div>';
+      else if (!onGrid) html += '<div class="banner ' + (left.length < groups.length ? 'mine' : 'none') + '">' +
+        (groups.length - left.length) + ' of ' + groups.length + ' topics booked. ' +
+        (left.length === 1 ? 'One to go.' : left.length + ' to go.') + '</div>';
     } else if (st.me && doneMe()) {
       html += '<div class="banner none">You\'ve already completed this training, so you can\'t sign up to attend. You can sign up as a <b>role player</b> on any date below.</div>';
     } else if (st.me) {
@@ -557,17 +616,24 @@ function start() {
       var rpMine = c.dates.filter(function (d) { return rpOf(d).seat && d.date >= st.today; });
       if (rpMine.length) html += '<div class="banner mine">You\'re a role player on ' + esc(rpMine.map(function (d) { return shortDay(d.date) + (times(d) ? ' ' + times(d) : ''); }).join(', ')) + '.</div>';
     }
-    html += '<h2 style="margin:18px 2px 10px"><i>2</i> &nbsp;' + (st.me && !closed ? (isIS() ? 'Pick a date for each topic' : 'Pick a date') : 'Dates') + '</h2>';
+    var headText = st.me && !closed ? (isIS() ? 'Pick a date for each topic' : 'Pick a date') : 'Dates';
+    var tally = '';
+    if (st.me && isIS()) {
+      var gotN = groups.filter(function (g) { return myStatus(g).seat; }).length;
+      tally = '<em class="tally' + (gotN === groups.length ? ' done' : '') + '">' + gotN + ' of ' + groups.length + ' booked</em>';
+    }
+    html += '<h2 class="sect">' + (st.me ? '' : '<i>2</i> &nbsp;') + headText + tally + '</h2>';
     // Days this officer already has, by topic (for "you're in X that day").
     var busyDays = {};
     if (isIS() && st.me) c.dates.forEach(function (d) { if (d['in'].some(isMe)) busyDays[d.date] = d.topic; });
     // A class with a handful of dates doesn't need a view picker; one
     // with a hundred and twenty does.
     var canPick = isIS() || c.dates.length > 2;
+    html += '<div class="ctrls">';
     if (canPick) {
       if (!isIS() && sortBy === 'topic') sortBy = 'date';
       html += '<div class="viewpick"><span>Show</span><select id="sortsel" aria-label="How to show the dates">' +
-        Object.keys(SORTS).filter(function (k) { return isIS() || k !== 'topic'; }).map(function (k) {
+        Object.keys(SORTS).filter(function (k) { return isIS() || (k !== 'topic' && k !== 'grid'); }).map(function (k) {
           return '<option value="' + k + '"' + (sortBy === k ? ' selected' : '') + '>' + SORTS[k] + '</option>';
         }).join('') + '</select></div>';
     }
@@ -575,8 +641,11 @@ function start() {
       html += '<label class="squadtog"><input type="checkbox" id="squadtog"' + (showSquads() ? ' checked' : '') +
         '> Show which squad is off</label>';
     }
+    html += '</div>';
     if (!canPick && sortBy === 'cal') sortBy = isIS() ? 'topic' : 'date';
-    if (sortBy === 'cal') {
+    if (sortBy === 'grid') {
+      html += gridHtml(closed);
+    } else if (sortBy === 'cal') {
       html += calHtml(closed, busyDays);
     } else if (isIS() && sortBy === 'date') {
       // Every date in order, each showing its topic.
@@ -701,22 +770,145 @@ function start() {
         }).join('');
     }
 
-    // What they've chosen, and the one button that does it.
-    var picks = Object.keys(calPick).map(function (id) { return byId[id]; })
+    html += pickBar(closed, 'Tap the days you want, then confirm them together.');
+    return html;
+  }
+
+  // What they've chosen and the one button that does it. Shared by the
+  // calendar and the grid, so picking works the same way in both.
+  function pickBar(closed, hint) {
+    var byId = {};
+    st.cls.dates.forEach(function (d) { byId[d.id] = d; });
+    var picks = Object.keys(calPick).map(function (id) { return byId[id]; }).filter(Boolean)
       .sort(function (a, b) { return a.date.localeCompare(b.date); });
-    if (picks.length) {
-      html += '<div class="calbar"><b>' + picks.length + (picks.length === 1 ? ' date picked' : ' dates picked') + '</b><ul>' +
-        picks.map(function (d) {
-          var was = isIS() ? myStatus(d.topic).seat : myStatus('').seat;
-          return '<li>' + (isIS() ? '<span>' + esc(d.topic) + '</span>' : '') + esc(day(d.date)) +
-            (was && was !== d ? ' <small>replaces ' + esc(shortDay(was.date)) + '</small>' : '') + '</li>';
-        }).join('') + '</ul>' +
-        (closed ? '<p class="note">' + esc(closed) + '</p>'
-          : '<button type="button" class="btn" id="calgo">Sign up for ' + (picks.length === 1 ? 'this date' : 'these ' + picks.length + ' dates') + '</button>') +
-        '<button type="button" class="link" id="calclear">Clear</button></div>';
-    } else if (!closed) {
-      html += '<p class="note">Tap the days you want, then confirm them together.</p>';
+    if (!picks.length) return closed ? '' : '<p class="note">' + esc(hint) + '</p>';
+    return '<div class="calbar"><b>' + picks.length + (picks.length === 1 ? ' date picked' : ' dates picked') + '</b><ul>' +
+      picks.map(function (d) {
+        var was = isIS() ? myStatus(d.topic).seat : myStatus('').seat;
+        return '<li>' + (isIS() ? '<span>' + esc(d.topic) + '</span>' : '') + esc(day(d.date)) +
+          (was && was !== d ? ' <small>replaces ' + esc(shortDay(was.date)) + '</small>' : '') + '</li>';
+      }).join('') + '</ul>' +
+      (closed ? '<p class="note">' + esc(closed) + '</p>'
+        : '<button type="button" class="btn" id="calgo">Sign up for ' + (picks.length === 1 ? 'this date' : 'these ' + picks.length + ' dates') + '</button>') +
+      '<button type="button" class="link" id="calclear">Clear</button></div>';
+  }
+
+  // ---------- The grid ----------
+  // Topics down the side, weeks across the top. The topics ladder
+  // Mon/Tue/Wed and step a week at a time, so they line up into columns
+  // and a whole week can be taken in one tap.
+
+  // The Monday of the week a date falls in.
+  function weekOf(key) {
+    var dt = new Date(+key.slice(0, 4), +key.slice(5, 7) - 1, +key.slice(8, 10));
+    dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+    return dt.getFullYear() + '-' + ('0' + (dt.getMonth() + 1)).slice(-2) + '-' + ('0' + dt.getDate()).slice(-2);
+  }
+
+  // Everything the grid needs, or null when the dates don't make a grid.
+  function gridPlan() {
+    var c = st.cls;
+    var rows = isIS() ? (c.topics || []) : [];
+    if (!rows.length) return null;
+    var shown = c.dates.filter(function (d) {
+      return !d.cancelled && (d.date >= st.today || myStatus(d.topic).seat === d);
+    });
+    if (!shown.length) return null;
+    var weeks = [], cells = {};
+    shown.forEach(function (d) {
+      var w = weekOf(d.date);
+      if (weeks.indexOf(w) < 0) weeks.push(w);
+      (cells[d.topic + '\u0000' + w] = cells[d.topic + '\u0000' + w] || []).push(d);
+    });
+    weeks.sort();
+    // A topic with no row of its own isn't on the class: drop it.
+    rows = rows.filter(function (g) { return shown.some(function (d) { return d.topic === g; }); });
+    if (!rows.length) return null;
+    return { rows: rows, weeks: weeks, cells: cells };
+  }
+
+  // The dates in a week this officer could still take, one per topic
+  // they haven't booked or picked yet.
+  function weekFree(plan, w) {
+    var out = [];
+    plan.rows.forEach(function (g) {
+      if (myStatus(g).seat) return;
+      if (Object.keys(calPick).some(function (id) {
+        var x = st.cls.dates.filter(function (y) { return y.id === id; })[0];
+        return x && x.topic === g;
+      })) return;
+      var list = plan.cells[g + '\u0000' + w] || [];
+      var open = list.filter(function (d) { return d.seats - d['in'].length > 0 && !d.started && d.date >= st.today; })[0];
+      if (open) out.push(open);
+    });
+    return out;
+  }
+
+  function gridHtml(closed) {
+    var plan = gridPlan();
+    if (!plan) return '<p class="note">No upcoming dates.</p>';
+    var html = '<div class="gwrap"><div class="gtable" style="--gcols:' + plan.weeks.length + '">' +
+      '<div class="gstick gcorner">Topic</div>';
+    plan.weeks.forEach(function (w, i) {
+      var free = st.me && !closed ? weekFree(plan, w) : [];
+      html += '<div class="ghead">Week ' + (i + 1) + '<small>' + esc(shortDay(w)) + '</small>' +
+        (st.me && !closed
+          ? '<button type="button" data-gweek="' + w + '"' + (free.length ? '' : ' disabled') + '>' +
+              (free.length ? 'Take week' : 'Take week') + '</button>'
+          : '') + '</div>';
+    });
+    plan.rows.forEach(function (g) {
+      var m = myStatus(g);
+      var pickedHere = Object.keys(calPick).map(function (id) {
+        return st.cls.dates.filter(function (y) { return y.id === id; })[0];
+      }).filter(function (x) { return x && x.topic === g; })[0];
+      html += '<div class="gstick grow"><b>' + esc(g) + '</b>' +
+        (m.seat ? '<small class="on">\u2713 ' + esc(shortDay(m.seat.date)) + '</small>'
+          : pickedHere ? '<small class="on">Picked ' + esc(shortDay(pickedHere.date)) + '</small>'
+          : m.wait ? '<small>Waitlisted</small>'
+          : st.me ? '<small>Not picked</small>' : '') + '</div>';
+      plan.weeks.forEach(function (w) {
+        var list = plan.cells[g + '\u0000' + w] || [];
+        if (!list.length) { html += '<div class="gcell none" aria-hidden="true">\u2013</div>'; return; }
+        var d = list[0];
+        var left = d.seats - d['in'].length, mineHere = m.seat === d, waitHere = m.wait && m.wait.d === d;
+        var picked = !!calPick[d.id], past = d.date < st.today || !!d.started;
+        var state = mineHere ? '\u2713 Yours' : picked ? 'Picked' : waitHere ? 'Waitlist'
+          : past ? 'Past' : left > 0 ? left + ' left' : 'Full';
+        var sq = showSquads() ? squadOff(d.date) : '';
+        html += '<button type="button" class="gcell' +
+          (mineHere ? ' got' : '') + (picked ? ' pick' : '') + ((!mineHere && !picked && (left <= 0 || past)) ? ' full' : '') +
+          (gridOpen === d.id ? ' sel' : '') + '" data-gcell="' + d.id + '"' +
+          ' aria-pressed="' + picked + '" aria-label="' + esc(g + ', ' + day(d.date) + ', ' + state) + '">' +
+          '<b>' + esc(shortDay(d.date)) + '</b><small>' + esc(state) + '</small>' +
+          (list.length > 1 ? '<i>+' + (list.length - 1) + ' more</i>' : sq ? '<i>' + esc(sq) + '-off</i>' : '') +
+          '</button>';
+      });
+    });
+    html += '</div></div>';
+    html += '<div class="glegend">' +
+      '<span><b style="background:var(--card)"></b>Open</span>' +
+      '<span><b style="background:var(--okbg);border-color:var(--ok)"></b>Yours</span>' +
+      '<span><b style="background:var(--navy);border-color:var(--navy)"></b>Picked</span>' +
+      '<span><b style="background:#F3F5F9"></b>Full</span>' +
+      (showSquads() ? '<span>A-off / B-off \u2014 the squad that\'s off</span>' : '') + '</div>';
+    if (plan.weeks.length > 2) html += '<p class="ghint">Swipe the grid sideways for later weeks. <b>Take week</b> books a whole week at once.</p>';
+
+    // The cell you tapped opens underneath, with everything about it:
+    // who's on it, the waitlist, role players, and how to drop out.
+    var open = gridOpen ? st.cls.dates.filter(function (x) { return x.id === gridOpen; })[0] : null;
+    if (open) {
+      var busyDays = {};
+      if (st.me) st.cls.dates.forEach(function (x) { if (x['in'].some(isMe)) busyDays[x.date] = x.topic; });
+      // No squad chip here: each card says it below, and two sessions in
+      // one week can fall on days with different squads off.
+      html += '<h3 class="topic">' + esc(open.topic || day(open.date)) + '</h3>';
+      (plan.cells[open.topic + '\u0000' + weekOf(open.date)] || [open]).forEach(function (d) {
+        html += dateCard(d, myStatus(d.topic), closed,
+          busyDays[d.date] && busyDays[d.date] !== d.topic ? busyDays[d.date] : '', false, false, !!calPick[d.id]);
+      });
     }
+    html += pickBar(closed, 'Tap the cells you want, then confirm them together.');
     return html;
   }
 
@@ -864,7 +1056,9 @@ function start() {
     if (!d.start) return '';
     return h < 5 ? 'Overnight' : h < 11 ? 'Morning' : h < 14 ? 'Midday' : h < 17 ? 'Afternoon' : 'Evening';
   }
-  function dateCard(d, mine, closed, also, showTopic, timeFirst) {
+  // noJoin: this date is already in the batch waiting to be confirmed, so
+  // the card doesn't offer a second, separate "Sign up" button.
+  function dateCard(d, mine, closed, also, showTopic, timeFirst, noJoin) {
     var taken = d['in'].length, left = d.seats - taken, past = d.date < st.today || !!d.started;
     var seatHere = mine.seat === d, waitHere = mine.wait && mine.wait.d === d;
     if (d.cancelled) {
@@ -926,6 +1120,8 @@ function start() {
       } else if (left > 0 && d.wait.length) {
         b = '<span class="note" style="flex:1 1 100%">A seat is open, but it\'s held for the people on the waitlist.</span>' +
           '<button type="button" class="btn ghost" data-op="wait" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Saving…' : 'Join the waitlist') + '</button>';
+      } else if (left > 0 && noJoin) {
+        b = '<span class="state ok">Picked. Confirm it below.</span>';
       } else if (left > 0) {
         var sw = !!mine.seat;
         b = '<button type="button" class="btn' + (sw ? ' ghost' : '') + '" data-op="join" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>' +
@@ -1437,8 +1633,33 @@ function start() {
       if (mm < 0) { mm = 11; yy--; } else if (mm > 11) { mm = 0; yy++; }
       calMonth = yy + '-' + ('0' + (mm + 1)).slice(-2); calDay = ''; render(); return;
     }
+    if (b.dataset.gcell) {
+      var gd = st.cls.dates.filter(function (x) { return x.id === b.dataset.gcell; })[0];
+      if (gd) {
+        gridOpen = gd.id;
+        var gLeft = gd.seats - gd['in'].length, gMine = myStatus(gd.topic).seat === gd;
+        var gPast = gd.date < st.today || !!gd.started;
+        // A free seat is picked as well as opened. A full one just opens,
+        // so they can join its waitlist from the card underneath.
+        if (st.me && !closedReason() && !gMine && !gPast && (gLeft > 0 || calPick[gd.id])) calPickOne(gd);
+        render();
+      }
+      return;
+    }
+    if (b.dataset.gweek) {
+      var plan = gridPlan();
+      if (plan) {
+        var free = weekFree(plan, b.dataset.gweek);
+        free.forEach(function (d) { calPickOne(d); });
+        gridOpen = '';
+        render();
+        toast(free.length ? 'Picked ' + free.length + (free.length === 1 ? ' date' : ' dates') + ' that week. Confirm below.'
+          : 'Nothing left to pick that week.', !free.length);
+      }
+      return;
+    }
     if (b.id === 'calgo') { calAsk(); return; }
-    if (b.id === 'calclear') { calPick = {}; calDay = ''; render(); return; }
+    if (b.id === 'calclear') { calPick = {}; calDay = ''; gridOpen = ''; render(); return; }
   });
   app.addEventListener('change', function (e) {
     if (e.target.id === 'squadtog') { store.set('ci-class-squads', e.target.checked ? 'on' : 'off'); render(); return; }
