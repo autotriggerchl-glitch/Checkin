@@ -24,7 +24,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-19c';
+var PAGE_VERSION = '2026-11-19d';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -364,7 +364,12 @@ var PAGE_VERSION = '2026-11-19c';
       else P.soon.push({ at: '9', text: b.title + ': your bid is in', sub: 'Bids close ' + when(b.closes), tab: 'bids', id: 'bd-' + b.id });
     });
     P.classesMine.forEach(function (c) {
-      (c.seats || []).forEach(function (s) { P.soon.push({ at: s.date + (s.start || ''), text: c.title, sub: md(s.date) + (s.start ? ' at ' + s.start : '') + (c.location ? ' · ' + c.location : ''), tab: 'training', id: 'cl-' + c.c }); });
+      (c.seats || []).forEach(function (s) {
+        P.soon.push({ at: s.date + (s.start || ''),
+          text: s.topic || c.title,
+          sub: [s.topic ? c.title : '', md(s.date) + (s.start ? ' at ' + s.start : ''), c.location].filter(Boolean).join(' · '),
+          tab: 'training', id: 'cl-' + c.c });
+      });
     });
     if (P.classesOpen.length) add(7, '', P.classesOpen.length + (P.classesOpen.length === 1 ? ' class' : ' classes') + ' open for sign-up', 'See them in Training', 'training', 'classes-open');
     P.needs.sort(function (a, b) { return a.rank - b.rank; });
@@ -841,7 +846,7 @@ var PAGE_VERSION = '2026-11-19c';
       if (c.rp) tags.push('<span class="tag rp">Role players wanted' + (c.rpLeft ? ': ' + c.rpLeft + ' left' : '') + '</span>');
     }
     if (c.done && !c.closed) tags.push('<span class="tag">You\'ve taken it: role player only</span>');
-    var hm = function (s) { return md(s.date) + (s.start ? ' ' + s.start + (s.end ? '-' + s.end : '') : ''); };
+    var hm = function (s) { return (s.topic ? s.topic + ': ' : '') + md(s.date) + (s.start ? ' ' + s.start + (s.end ? '-' + s.end : '') : ''); };
     var lines = c.seats.map(hm).concat(rpS.map(function (s) { return hm(s) + ' (role player)'; }));
     return '<a class="cls' + (c.seats.length || rpS.length ? ' mine' : '') + '" id="c-cl-' + esc(c.c) + '" href="' + esc(url) + '"><div class="ct"><b>' + esc(c.title) + '</b><span class="chev" aria-hidden="true">›</span></div>' +
       '<div class="tags">' + tags.join('') + '</div>' +
