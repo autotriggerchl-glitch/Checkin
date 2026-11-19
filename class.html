@@ -1248,21 +1248,37 @@ function start() {
   }
 
   var refreshing = false;
+  // Tapping Refresh used to look like nothing happened: no change to the
+  // button while it worked, then "Up to date", which reads like a brush-off
+  // rather than an answer. And every one of the early exits dropped out
+  // silently, so a tap during a save did nothing at all.
   function refresh(quiet) {
-    if (refreshing || st.sending || st.queue.length) return;
+    if (refreshing) return;
+    if (st.sending || st.queue.length) { if (!quiet) toast('Still saving your last change \u2014 one moment.'); return; }
     refreshing = true;
+    var btn = $('refresh');
+    if (btn && !quiet) { btn.disabled = true; btn.textContent = 'Checking\u2026'; }
+    var done = function (msg, bad) {
+      refreshing = false;
+      var b2 = $('refresh');
+      if (b2) { b2.disabled = false; b2.textContent = 'Refresh'; }
+      if (!quiet && msg) toast(msg, bad);
+    };
     google.script.run
       .withSuccessHandler(function (res) {
-        refreshing = false;
-        if (res && res.gone) { stop('Class sign-up', res.message); return; }
-        if (!res || !res.ok || st.sending || st.queue.length) return;
+        if (res && res.gone) { refreshing = false; stop('Class sign-up', res.message); return; }
+        if (!res || !res.ok) { done('Couldn\'t refresh. Try again in a moment.', true); return; }
+        if (st.sending || st.queue.length) { done(''); return; }
+        // Say whether anything actually moved, so a quick answer doesn't
+        // look like a refusal to check.
+        var before = JSON.stringify(st.cls.dates || []);
         st.cls = res.cls; st.today = res.today || st.today; if (res.done) st.done = res.done;
+        var changed = JSON.stringify(st.cls.dates || []) !== before;
         // Don't redraw under someone typing their name.
-        if (document.activeElement && document.activeElement.id === 'q') return;
-        render();
-        if (!quiet) toast('Up to date.');
+        if (!(document.activeElement && document.activeElement.id === 'q')) render();
+        done(changed ? 'Updated \u2014 something changed.' : 'Checked. Nothing new.');
       })
-      .withFailureHandler(function () { refreshing = false; if (!quiet) toast('Couldn\'t refresh. Check your signal.', true); })
+      .withFailureHandler(function () { done('Couldn\'t refresh. Check your signal.', true); })
       .ciClassState({ c: DATA.c, k: DATA.k });
   }
 
