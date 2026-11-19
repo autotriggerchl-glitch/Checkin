@@ -34,6 +34,8 @@
   .btn { min-height: 50px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--navy); color: #fff; font-size: 17px; font-weight: 700; cursor: pointer; width: 100%; }
   .btn.ghost { background: #fff; color: var(--navy); border: 1.5px solid var(--navy); }
   .btn:disabled { opacity: .55; }
+  .pinconf { display: flex; gap: 8px; margin-top: 10px; }
+  .pinconf .btn { flex: 1; min-height: 44px; font-size: 15px; }
   .field { display: block; margin: 12px 0 0; }
   .field span { display: block; font-size: 14px; font-weight: 700; margin: 0 0 4px; }
   input[type=text], input[type=email], input[type=password] {
@@ -271,14 +273,36 @@
     app.querySelectorAll('input[inputmode=numeric]').forEach(function (el) { el.oninput = function () { var v = el.value.replace(/\D/g, '').slice(0, 4); if (v !== el.value) el.value = v; }; });
     app.onkeydown = function (e) { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); signIn(); } };
     $('go').onclick = signIn;
+    // Asking for a code shouldn't fire one off on the tap. Say which
+    // address it's going to and let them think again - an officer who
+    // doesn't read that mailbox needs to know before they sit waiting.
+    var send = function () {
+      var b = $('forgot'), msg = $('forgotmsg');
+      if (b) b.disabled = true;
+      msg.hidden = false; msg.textContent = 'Sending…';
+      api('pinForgot', { name: st.me.name, call: st.me.call }).then(function (res) {
+        if (b) { b.disabled = false; b.hidden = !(res && res.ok); }
+        st.forgotMsg = esc((res && res.message) || 'That didn\'t work.') + (res && res.ok ? ' <b>Type it in above.</b>' : res && res.none ? '' : ' <b>Or contact the training coordinator.</b>');
+        msg.innerHTML = st.forgotMsg; var pf = $('p1'); if (pf) pf.focus();
+      }, function () { if (b) { b.disabled = false; b.hidden = false; } msg.textContent = 'Couldn\'t reach the training system. Check your signal.'; });
+    };
     if ($('forgot')) $('forgot').onclick = function () {
       var b = $('forgot'), msg = $('forgotmsg');
-      b.disabled = true; msg.hidden = false; msg.textContent = 'Sending…';
-      api('pinForgot', { name: st.me.name, call: st.me.call }).then(function (res) {
-        b.disabled = false;
-        st.forgotMsg = esc((res && res.message) || 'That didn\'t work.') + (res && res.ok ? ' <b>Type it in above.</b>' : res && res.none ? '' : ' <b>Or contact the training coordinator.</b>');
-        msg.innerHTML = st.forgotMsg; $('p1').focus();
-      }, function () { b.disabled = false; msg.textContent = 'Couldn\'t reach the training system. Check your signal.'; });
+      b.hidden = true; msg.hidden = false; msg.textContent = 'Checking where to send it\u2026';
+      api('pinWhere', { name: st.me.name, call: st.me.call }).then(function (res) {
+        if (res && res.ok && res.masked) {
+          msg.innerHTML = 'Send a temporary PIN to <b>' + esc(res.masked) + '</b>?' +
+            '<span class="pinconf"><button type="button" class="btn ghost" id="nosend">Cancel</button>' +
+            '<button type="button" class="btn" id="dosend">Send it</button></span>';
+          $('dosend').onclick = send;
+          $('nosend').onclick = function () { msg.hidden = true; msg.innerHTML = ''; st.forgotMsg = ''; b.hidden = false; };
+        } else if (res && res.none) {
+          msg.innerHTML = esc(res.message || 'We have no email for you.');
+        } else {
+          msg.innerHTML = esc((res && res.message) || 'That didn\'t work.') + ' <b>Contact the training coordinator.</b>';
+          b.hidden = false;
+        }
+      }, function () { msg.textContent = 'Couldn\'t reach the training system. Check your signal.'; b.hidden = false; });
     };
     setTimeout(function () { var f = $(isNew ? 'em' : 'p1'); if (f) f.focus(); }, 50);
   }

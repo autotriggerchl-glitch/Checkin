@@ -131,6 +131,8 @@
   .pinf span { display: block; font-size: 14px; font-weight: 700; margin: 0 0 4px; }
   .pinf input { width: 100%; min-height: 50px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 12px; font-size: 20px; }
   .pinf input[type=password] { letter-spacing: 8px; font-weight: 700; }
+  .pinconf { display: flex; gap: 8px; margin-top: 10px; }
+  .pinconf .btn { flex: 1; min-height: 44px; font-size: 15px; }
   .pin-err { color: var(--err); font-weight: 600; min-height: 1.3em; margin: 10px 0 0; font-size: 15px; }
   .pinbtns { display: flex; gap: 10px; margin-top: 12px; }
   .viewpick { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
@@ -1156,7 +1158,9 @@ function start() {
       ov.addEventListener('click', function (e) {
         var b = e.target.closest && e.target.closest('button');
         if (e.target === ov || (b && b.id === 'pin-cancel')) { ov.hidden = true; return; }
-        if (b && b.id === 'pin-forgot') { forgotPin(); return; }
+        if (b && b.id === 'pin-forgot') { forgotAsk(); return; }
+        if (b && b.id === 'pin-nosend') { var m0 = $('pin-forgot-msg'); if (m0) { m0.hidden = true; m0.innerHTML = ''; } var fb = $('pin-forgot'); if (fb) fb.hidden = false; return; }
+        if (b && b.id === 'pin-send') { forgotPin(); return; }
         if (b && b.id === 'pin-go') pinSubmit();
       });
       ov.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); pinSubmit(); } });
@@ -1180,52 +1184,56 @@ function start() {
         : '<h2 class="pint">Enter your PIN</h2><p class="note">The 4-digit PIN you made the first time you signed up for a class. This phone will remember it.</p>' +
           pinBox('pin-1', 'PIN')) +
       '<p class="pin-err" id="pin-err" role="alert">' + esc(mode === 'new' && !message ? '' : message || '') + '</p>' +
-      (isNew ? '' : '<p class="note" id="pin-where">Checking where a code would go\u2026</p>' +
-        '<button type="button" class="link" id="pin-forgot">Forgot your PIN? Email me a temporary PIN</button>' +
+      (isNew ? '' : '<button type="button" class="link" id="pin-forgot">Forgot your PIN? Email me a temporary PIN</button>' +
         '<p class="note" id="pin-forgot-msg" hidden>' + (mode === 'locked' ? 'Tap the link above for a temporary PIN by email, or wait 15 minutes.' : '') + '</p>') +
       '<div class="pinbtns"><button type="button" class="btn ghost" id="pin-cancel">Cancel</button>' +
         '<button type="button" class="btn" id="pin-go"' + (mode === 'locked' ? ' disabled' : '') + '>' + (isNew ? 'Save and sign up' : 'Continue') + '</button></div>' +
       '</div>';
     if (mode === 'locked') $('pin-forgot-msg').hidden = false;
-    if (!isNew) pinWhere();
     ov.hidden = false;
     var first = $(isNew ? 'pin-email' : 'pin-1');
     if (first) setTimeout(function () { first.focus(); }, 50);
   }
 
-  // A temporary PIN goes to the Employee Directory address, so say which
-  // one that is before anyone taps Forgot. Someone whose Directory entry
-  // has no email finds out here, instead of waiting for an email that
-  // was never going to come.
-  function pinWhere() {
-    if (!st.me) return;
+  // Asking for a code shouldn't fire one off on the tap. Say which
+  // address it's going to and let them think again - an officer who
+  // doesn't read that mailbox needs to know before they sit waiting.
+  function forgotAsk() {
+    var msg = $('pin-forgot-msg'), btn = $('pin-forgot');
+    if (!msg || !st.me) return;
+    if (btn) btn.hidden = true;
+    msg.hidden = false;
+    msg.textContent = 'Checking where to send it\u2026';
     api('pinWhere', { name: st.me.name, call: st.me.call }).then(function (res) {
-      var el = $('pin-where'), btn = $('pin-forgot');
-      if (!el) return;
       if (res && res.ok && res.masked) {
-        el.innerHTML = 'Forgotten it? We\'ll email a code to <b>' + esc(res.masked) + '</b>.';
+        msg.innerHTML = 'Send a temporary PIN to <b>' + esc(res.masked) + '</b>?' +
+          '<span class="pinconf"><button type="button" class="btn ghost" id="pin-nosend">Cancel</button>' +
+          '<button type="button" class="btn" id="pin-send">Send it</button></span>';
       } else if (res && res.none) {
-        el.innerHTML = esc(res.message || 'We have no email for you.');
-        if (btn) btn.hidden = true;   // nothing to send to
+        msg.innerHTML = esc(res.message || 'We have no email for you.');
       } else {
-        el.hidden = true;
+        msg.innerHTML = esc((res && res.message) || 'That didn\'t work.') + ' <b>Contact the training coordinator.</b>';
+        if (btn) btn.hidden = false;
       }
-    }, function () { var el = $('pin-where'); if (el) el.hidden = true; });
+    }, function () {
+      msg.textContent = 'Couldn\'t reach the training system. Check your signal.';
+      if (btn) btn.hidden = false;
+    });
   }
 
   // Forgot the PIN: a temporary one goes to the Employee Directory email.
   function forgotPin() {
     var msg = $('pin-forgot-msg'), btn = $('pin-forgot');
-    if (!msg || !st.me || btn.disabled) return;
-    btn.disabled = true;
+    if (!msg || !st.me) return;
+    if (btn) btn.disabled = true;
     msg.hidden = false; msg.textContent = 'Sending…';
     api('pinForgot', { name: st.me.name, call: st.me.call }).then(function (res) {
-      btn.disabled = false;
+      if (btn) { btn.disabled = false; btn.hidden = !(res && res.ok); }
       msg.innerHTML = esc((res && res.message) || 'That didn\'t work.') + (res && res.ok ? ' <b>Type it in above.</b>' : res && res.none ? '' : ' <b>Or contact the training coordinator.</b>');
       // A locked screen can take the temporary PIN.
       if (res && res.ok && st.pinMode === 'locked') { st.pinMode = 'need'; $('pin-go').disabled = false; var p = $('pin-1'); if (p) p.focus(); }
     }, function () {
-      btn.disabled = false;
+      if (btn) { btn.disabled = false; btn.hidden = false; }
       msg.textContent = 'Couldn\'t reach the training system. Check your signal, or contact the training coordinator.';
     });
   }
