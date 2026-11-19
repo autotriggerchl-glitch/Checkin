@@ -24,7 +24,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-19i';
+var PAGE_VERSION = '2026-11-19l';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -129,6 +129,8 @@ var PAGE_VERSION = '2026-11-19i';
   input:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px rgba(47, 111, 214, .2); }
   input.pin { letter-spacing: 8px; font-weight: 700; font-size: 20px; }
   .row2 { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  .row2.one { justify-content: center; }
+  .btn.setup { margin-top: 10px; }
   .me { display: flex; align-items: center; gap: 12px; }
   .me .av { flex: none; width: 46px; height: 46px; border-radius: 50%; background: var(--navy); color: #fff; display: grid; place-items: center; font-weight: 800; border: 2px solid var(--gold); }
   .me div { flex: 1; min-width: 0; }
@@ -974,8 +976,8 @@ var PAGE_VERSION = '2026-11-19i';
       '<label class="field"><span>PIN</span><input type="password" class="pin" id="p1" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password"></label>' +
       '<p class="err" id="err">' + esc(st.err) + '</p>' +
       '<div class="btns"><button type="button" class="btn" id="go"' + (st.busy ? ' disabled' : '') + '>' + (st.busy ? 'Checking…' : 'Sign in') + '</button></div>' +
-      '<div class="row2"><button type="button" class="link" id="first">First time? Set up your PIN</button>' +
-        '<button type="button" class="link" id="forgot"' + (st.forgot ? ' disabled' : '') + '>' + (st.forgot ? 'Sending\u2026' : 'Forgot PIN?') + '</button></div>' +
+      '<button type="button" class="btn ghost setup" id="first">Set up PIN</button>' +
+      '<div class="row2 one"><button type="button" class="link" id="forgot"' + (st.forgot ? ' disabled' : '') + '>' + (st.forgot ? 'Sending\u2026' : 'Forgot PIN?') + '</button></div>' +
       (st.forgotMsg ? '<p class="note" id="forgotmsg" style="margin-top:10px">' + st.forgotMsg + '</p>' + (st.forgotSent ? waitNote() : '') : '') + '</div>';
     $('p1').oninput = function () { this.value = this.value.replace(/\D/g, '').slice(0, 4); };
     app.onkeydown = function (e) { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); login(); } };
