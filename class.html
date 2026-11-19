@@ -22,7 +22,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-19j';
+var PAGE_VERSION = '2026-11-19k';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -1652,9 +1652,13 @@ function start() {
     };
     ov.innerHTML = '<div class="pincard">' +
       (isNew
-        ? '<h2 class="pint">Set up your sign-ups</h2><p class="note">Make up a 4-digit PIN. It\'s one PIN for all your class sign-ups: ' +
-            'you\'ll use it to sign up or make changes from any phone or computer. This phone will remember it. ' +
-            'You\'ll get an email when you sign up or make a change, with an "add to calendar" link, and a reminder the day before.</p>' +
+        ? '<h2 class="pint">Make up your PIN</h2>' +
+          '<p class="note"><b>Nothing is emailed to you \u2014 you choose your PIN right here, now.</b> ' +
+            'It\'s one PIN for all your class sign-ups: you\'ll use it to sign up or make changes from any ' +
+            'phone or computer, and this phone will remember it.</p>' +
+          '<p class="note" style="margin-top:8px">' + (isIS()
+            ? 'In-Service doesn\'t send sign-up emails. Your dates live on the Officer Portal, and you\'ll get a reminder the day before each one.'
+            : 'You\'ll get an email when you sign up or make a change, with an "add to calendar" link, and a reminder the day before.') + '</p>' +
           '<label class="pinf"><span>Email</span><input id="pin-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com"></label>' +
           pinBox('pin-1', 'Make up a PIN (4 numbers)') + pinBox('pin-2', 'Type the PIN again')
         : '<h2 class="pint">Enter your PIN</h2><p class="note">The 4-digit PIN you made the first time you signed up for a class. This phone will remember it.</p>' +
