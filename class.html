@@ -22,7 +22,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-19f';
+var PAGE_VERSION = '2026-11-19g';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -694,7 +694,7 @@ function start() {
     var groups = isIS() ? (c.topics || []) : [''];
     // Settle the view first: the grid carries its own checklist, so the
     // page above it can be much shorter.
-    if (!sortBy) sortBy = isIS() && gridPlan() ? 'grid' : 'date';
+    if (!sortBy) sortBy = 'date';
     if (sortBy === 'grid' && !(isIS() && gridPlan())) sortBy = isIS() ? 'topic' : 'date';
     var onGrid = sortBy === 'grid' && isIS();
     // A pick that's since become theirs, was cancelled or has passed
