@@ -24,7 +24,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-19d';
+var PAGE_VERSION = '2026-11-19e';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -168,6 +168,16 @@ var PAGE_VERSION = '2026-11-19d';
   .tag.rp { background: #E6EBF3; color: var(--navy); }
   @media (prefers-color-scheme: dark) { .tag.rp { background: #22324F; color: #C9D6EE; } } .tag.wait { background: var(--waitbg); color: var(--wait); } .tag.closed { background: var(--errbg); color: var(--err); }
   .when { margin: 8px 0 0; font-size: 15px; color: var(--muted); }
+  /* One date per row. Topic names run long, so they get a line of their own. */
+  /* Two columns across the whole list, so every date lines up however
+     long the topic names are. */
+  .dts { list-style: none; margin: 8px 0 0; padding: 0; display: grid;
+    grid-template-columns: max-content minmax(0, 1fr); gap: 0 12px; font-size: 15px; }
+  .dts li { display: contents; }
+  .dts b, .dts span { padding: 5px 0; border-top: 1px solid var(--line); }
+  .dts li:first-child b, .dts li:first-child span { border-top: 0; padding-top: 2px; }
+  .dts b { font-weight: 700; color: var(--ink); white-space: nowrap; }
+  .dts span { color: var(--muted); overflow-wrap: anywhere; }
   .empty { text-align: center; color: var(--muted); padding: 14px 8px; font-size: 15.5px; }
   .foot { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 13px; margin-top: 8px; }
   .ov { position: fixed; inset: 0; z-index: 30; display: flex; align-items: flex-end; justify-content: center; background: rgba(13, 22, 38, .55); padding: 12px; }
@@ -846,11 +856,19 @@ var PAGE_VERSION = '2026-11-19d';
       if (c.rp) tags.push('<span class="tag rp">Role players wanted' + (c.rpLeft ? ': ' + c.rpLeft + ' left' : '') + '</span>');
     }
     if (c.done && !c.closed) tags.push('<span class="tag">You\'ve taken it: role player only</span>');
-    var hm = function (s) { return (s.topic ? s.topic + ': ' : '') + md(s.date) + (s.start ? ' ' + s.start + (s.end ? '-' + s.end : '') : ''); };
-    var lines = c.seats.map(hm).concat(rpS.map(function (s) { return hm(s) + ' (role player)'; }));
+    var row = function (s, tail) {
+      // The span is always there, empty or not, so the columns stay square.
+      return '<li><b>' + esc(md(s.date) + (s.start ? ' ' + s.start + (s.end ? '-' + s.end : '') : '')) + '</b>' +
+        '<span>' + esc([s.topic, tail].filter(Boolean).join(' \u00b7 ')) + '</span></li>';
+    };
+    var rows = c.seats.map(function (s) { return row(s, ''); })
+      .concat(rpS.map(function (s) { return row(s, 'role player'); }));
     return '<a class="cls' + (c.seats.length || rpS.length ? ' mine' : '') + '" id="c-cl-' + esc(c.c) + '" href="' + esc(url) + '"><div class="ct"><b>' + esc(c.title) + '</b><span class="chev" aria-hidden="true">›</span></div>' +
       '<div class="tags">' + tags.join('') + '</div>' +
-      '<p class="when">' + esc(lines.length ? lines.join(' · ') : [range, c.location].filter(Boolean).join(' · ')) + (c.deadline && !c.closed ? '<br>Sign up by ' + esc(md(c.deadline)) : '') + '</p></a>';
+      (rows.length ? '<ul class="dts">' + rows.join('') + '</ul>' : '') +
+      (rows.length && !(c.deadline && !c.closed) ? '' :
+        '<p class="when">' + (rows.length ? '' : esc([range, c.location].filter(Boolean).join(' · '))) +
+          (c.deadline && !c.closed ? (rows.length ? '' : '<br>') + 'Sign up by ' + esc(md(c.deadline)) : '') + '</p>') + '</a>';
   }
 
   function ordinal(n) { var s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
