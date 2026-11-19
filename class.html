@@ -22,7 +22,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-19a';
+var PAGE_VERSION = '2026-11-19b';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -407,6 +407,28 @@ function start() {
   var calPick = {};   // dates chosen but not confirmed yet, by id
   var gridOpen = '';  // the grid cell opened underneath, by date id
 
+  // Picks live on this phone until they're confirmed, so a locked screen
+  // or a stray reload doesn't throw away a careful set of choices.
+  function pickKey() { return st.me ? 'ci-pick-' + DATA.c + '-' + st.me.name + '|' + st.me.call : ''; }
+  function savePicks() {
+    if (!st.me) return;
+    var ids = Object.keys(calPick);
+    store.set(pickKey(), ids.length ? JSON.stringify(ids) : '');
+  }
+  function loadPicks() {
+    calPick = {};
+    if (!st.me) return;
+    var raw = store.get(pickKey());
+    if (!raw) return;
+    try {
+      JSON.parse(raw).forEach(function (id) {
+        var d = st.cls.dates.filter(function (x) { return x.id === id; })[0];
+        // Anything cancelled, gone, past or already theirs quietly drops out.
+        if (d && !d.cancelled && d.date >= st.today && !d['in'].some(isMe)) calPick[id] = true;
+      });
+    } catch (e) {}
+  }
+
   var st = { cls: DATA.cls, today: DATA.today, done: DATA.done || [], me: null, matches: [], busy: '', confirm: '', confirmTimer: null };
 
   function peopleOf(list) {
@@ -436,6 +458,7 @@ function start() {
       (saved.call ? PEOPLE.filter(function (p) { return p.call && p.call.toUpperCase() === String(saved.call).toUpperCase(); })[0] : null) || null;
   } catch (e) {}
 
+  loadPicks();   // anything picked last time and never confirmed
   render();
 
   function stop(title, message) {
@@ -551,7 +574,7 @@ function start() {
     bar.hidden = !show;
     document.body.classList.toggle('hasdone', show);
     var say = $('donesay');
-    if (say) say.textContent = isIS() ? 'Finished picking? Tap Done to save your dates.'
+    if (say) say.textContent = isIS() ? 'Your dates are saved. Tap Done to check what\'s left.'
       : 'Finished picking? We\'ll email you one list of all your dates.';
     var b = $('done-go');
     if (b) { b.disabled = !!st.finishing; b.textContent = st.finishing ? 'Sending…' : 'Done'; }
@@ -572,6 +595,16 @@ function start() {
     if (!sortBy) sortBy = isIS() && gridPlan() ? 'grid' : 'date';
     if (sortBy === 'grid' && !(isIS() && gridPlan())) sortBy = isIS() ? 'topic' : 'date';
     var onGrid = sortBy === 'grid' && isIS();
+    // A pick that's since become theirs, was cancelled or has passed
+    // drops out, however it got there (a stale cache, another phone).
+    if (st.me) {
+      var dropped = false;
+      Object.keys(calPick).forEach(function (id) {
+        var x = c.dates.filter(function (y) { return y.id === id; })[0];
+        if (!x || x.cancelled || x.date < st.today || x['in'].some(isMe)) { delete calPick[id]; dropped = true; }
+      });
+      if (dropped) savePicks();
+    }
     var mine = myStatus(groups[0]);
     var html =
       '<div class="card"><h1 class="title">' + esc(c.title) + '</h1>' +
@@ -782,7 +815,8 @@ function start() {
     var picks = Object.keys(calPick).map(function (id) { return byId[id]; }).filter(Boolean)
       .sort(function (a, b) { return a.date.localeCompare(b.date); });
     if (!picks.length) return closed ? '' : '<p class="note">' + esc(hint) + '</p>';
-    return '<div class="calbar"><b>' + picks.length + (picks.length === 1 ? ' date picked' : ' dates picked') + '</b><ul>' +
+    return '<div class="calbar"><b>' + picks.length + (picks.length === 1 ? ' date picked' : ' dates picked') +
+      (closed ? '' : ' \u2014 not signed up yet') + '</b><ul>' +
       picks.map(function (d) {
         var was = isIS() ? myStatus(d.topic).seat : myStatus('').seat;
         return '<li>' + (isIS() ? '<span>' + esc(d.topic) + '</span>' : '') + esc(day(d.date)) +
@@ -925,7 +959,7 @@ function start() {
   }
 
   function calPickOne(d) {
-    if (calPick[d.id]) { delete calPick[d.id]; return; }
+    if (calPick[d.id]) { delete calPick[d.id]; savePicks(); return; }
     if (isIS()) {
       // Only one date per topic can be waiting to be confirmed.
       Object.keys(calPick).forEach(function (id) {
@@ -934,6 +968,7 @@ function start() {
       });
     }
     calPick[d.id] = true;
+    savePicks();
   }
 
   // "A, B and C"
@@ -1030,7 +1065,7 @@ function start() {
     st.switchOk = true;
     ids.forEach(function (id) { send('join', id); });
     st.switchOk = false;
-    calPick = {}; calDay = '';
+    calPick = {}; calDay = ''; savePicks();
     render();
   }
 
@@ -1223,6 +1258,7 @@ function start() {
     st.me = p;
     store.set(meKey, JSON.stringify({ name: p.name, call: p.call }));
     store.set('ci-class-me', JSON.stringify({ name: p.name, call: p.call }));
+    loadPicks();
     render();
   }
 
@@ -1618,7 +1654,7 @@ function start() {
     var b = e.target.closest && e.target.closest('button');
     if (!b) return;
     if (b.dataset.pick != null) { choose(+b.dataset.pick); return; }
-    if (b.id === 'change') { st.me = null; drawDone(); st.confirm = ''; st.pin = ''; st.email = ''; store.set(meKey, ''); store.set('ci-class-me', ''); render(); var q = $('q'); if (q) q.focus(); return; }
+    if (b.id === 'change') { st.me = null; calPick = {}; gridOpen = ''; drawDone(); st.confirm = ''; st.pin = ''; st.email = ''; store.set(meKey, ''); store.set('ci-class-me', ''); render(); var q = $('q'); if (q) q.focus(); return; }
     if (b.id === 'refresh') { refresh(false); return; }
     if (b.id === 'forget') { savePass(''); st.pin = ''; render(); toast('This phone forgot your PIN.'); return; }
     if (b.dataset.op) { act(b.dataset.op, b.dataset.d); return; }
@@ -1651,6 +1687,7 @@ function start() {
       if (plan) {
         var free = weekFree(plan, b.dataset.gweek);
         free.forEach(function (d) { calPickOne(d); });
+        savePicks();
         gridOpen = '';
         render();
         toast(free.length ? 'Picked ' + free.length + (free.length === 1 ? ' date' : ' dates') + ' that week. Confirm below.'
@@ -1659,7 +1696,7 @@ function start() {
       return;
     }
     if (b.id === 'calgo') { calAsk(); return; }
-    if (b.id === 'calclear') { calPick = {}; calDay = ''; gridOpen = ''; render(); return; }
+    if (b.id === 'calclear') { calPick = {}; calDay = ''; gridOpen = ''; savePicks(); render(); return; }
   });
   app.addEventListener('change', function (e) {
     if (e.target.id === 'squadtog') { store.set('ci-class-squads', e.target.checked ? 'on' : 'off'); render(); return; }
