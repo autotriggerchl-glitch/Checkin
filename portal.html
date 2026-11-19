@@ -24,7 +24,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-19e';
+var PAGE_VERSION = '2026-11-19h';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -111,6 +111,9 @@ var PAGE_VERSION = '2026-11-19e';
   h2 { margin: 22px 2px 10px; font: 700 19px/1.2 "Zilla Slab", Georgia, serif; display: flex; align-items: center; gap: 8px; }
   h2 em { font: 700 13px "Source Sans 3", sans-serif; padding: 1px 8px; border-radius: 999px; background: var(--line); color: var(--ink); }
   .note { color: var(--muted); font-size: 15.5px; margin: 0; }
+  .helpnote { margin: 10px 0 0; padding: 11px 13px; border-radius: 10px; font-size: 15px; line-height: 1.4;
+    background: var(--field); color: var(--ink); border-left: 4px solid var(--line); }
+  .helpnote.late { background: var(--waitbg); color: var(--wait); border-left-color: var(--wait); font-weight: 600; }
   .err { color: var(--err); font-weight: 600; font-size: 15px; min-height: 1.3em; margin: 10px 0 0; }
   .link { border: 0; background: none; color: var(--focus); font-weight: 700; padding: 8px 2px; cursor: pointer; font-size: 15px; }
   .link:disabled { color: var(--muted); cursor: default; }
@@ -944,6 +947,26 @@ var PAGE_VERSION = '2026-11-19e';
     };
   }
 
+  // ---------- When the email doesn't turn up ----------
+  // Department mail filters swallow these, and an officer stuck on this
+  // screen has no idea what to do. So: check junk first, and if there's
+  // still nothing after five minutes, go and see somebody.
+  var HELP_WHO = (typeof HELP_CONTACT !== 'undefined' && HELP_CONTACT) ? HELP_CONTACT : 'the training officer';
+  var waitTimer = null;
+  function startWait() {
+    st.waited = false;
+    clearTimeout(waitTimer);
+    waitTimer = setTimeout(function () { st.waited = true; render(); }, 5 * 60000);
+  }
+  function stopWait() { clearTimeout(waitTimer); waitTimer = null; st.waited = false; }
+  function waitNote() {
+    return st.waited
+      ? '<p class="helpnote late"><b>Still nothing?</b> The department\'s mail filter blocks these for some people. ' +
+          'See <b>' + esc(HELP_WHO) + '</b> and you can be set up by hand.</p>'
+      : '<p class="helpnote">It usually lands in under a minute. <b>Check your junk mail.</b> ' +
+          'If there\'s nothing after 5 minutes, see ' + esc(HELP_WHO) + '.</p>';
+  }
+
   // ---------- Sign in ----------
   function renderLogin() {
     app.innerHTML = '<div class="card"><h1>Sign in</h1><p class="note">Use your department email and your 4-number PIN (the same PIN as class sign-ups). This phone will remember you.</p>' +
@@ -953,7 +976,7 @@ var PAGE_VERSION = '2026-11-19e';
       '<div class="btns"><button type="button" class="btn" id="go"' + (st.busy ? ' disabled' : '') + '>' + (st.busy ? 'Checking…' : 'Sign in') + '</button></div>' +
       '<div class="row2"><button type="button" class="link" id="first">First time? Set up your PIN</button>' +
         '<button type="button" class="link" id="forgot"' + (st.forgot ? ' disabled' : '') + '>' + (st.forgot ? 'Sending\u2026' : 'Forgot PIN?') + '</button></div>' +
-      (st.forgotMsg ? '<p class="note" id="forgotmsg" style="margin-top:10px">' + st.forgotMsg + '</p>' : '') + '</div>';
+      (st.forgotMsg ? '<p class="note" id="forgotmsg" style="margin-top:10px">' + st.forgotMsg + '</p>' + (st.forgotSent ? waitNote() : '') : '') + '</div>';
     $('p1').oninput = function () { this.value = this.value.replace(/\D/g, '').slice(0, 4); };
     app.onkeydown = function (e) { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); login(); } };
     $('go').onclick = login;
@@ -966,6 +989,8 @@ var PAGE_VERSION = '2026-11-19e';
       st.forgot = 1; st.forgotMsg = ''; st.err = ''; render();
       api('portalForgot', { email: st.email }).then(function (res) {
         st.forgot = 0;
+        st.forgotSent = !!(res && res.ok);
+        if (st.forgotSent) startWait(); else stopWait();
         st.forgotMsg = esc((res && res.message) || 'That didn\'t work.');
         render();
         toast((res && res.message) || 'That didn\'t work.', !(res && res.ok));
@@ -996,7 +1021,7 @@ var PAGE_VERSION = '2026-11-19e';
   // First time: a code by email, then make up a PIN.
   function renderSetup() {
     app.innerHTML = '<div class="card"><h1>Set up your PIN</h1>' +
-      (st.sent ? '<p class="note">We emailed a 6-digit code to <b>' + esc(st.email) + '</b>. Enter it, then make up a 4-number PIN.</p>' +
+      (st.sent ? '<p class="note">We emailed a 6-digit code to <b>' + esc(st.email) + '</b>. Enter it, then make up a 4-number PIN.</p>' + waitNote() +
           '<label class="field"><span>Code from the email</span><input type="text" id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></label>' +
           '<label class="field"><span>Make up a PIN (4 numbers)</span><input type="password" class="pin" id="n1" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label>' +
           '<label class="field"><span>Type the PIN again</span><input type="password" class="pin" id="n2" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></label>'
@@ -1006,16 +1031,16 @@ var PAGE_VERSION = '2026-11-19e';
         (st.busy ? 'One moment…' : st.sent ? 'Set up and sign in' : 'Email me a code') + '</button></div>' +
       (st.sent ? '<div class="row2"><button type="button" class="link" id="resend">Send a new code</button></div>' : '') + '</div>';
     app.querySelectorAll('input[inputmode=numeric]').forEach(function (el) { el.oninput = function () { el.value = el.value.replace(/\D/g, '').slice(0, el.maxLength); }; });
-    $('back').onclick = function () { st.step = 'login'; st.err = ''; render(); };
+    $('back').onclick = function () { st.step = 'login'; st.err = ''; stopWait(); render(); };
     var send = function () {
       st.busy = true; render();
       api('portalSetup', { email: st.email }).then(function (res) {
         st.busy = false;
-        if (res && res.ok) { st.sent = true; st.err = ''; render(); toast(res.message); return; }
+        if (res && res.ok) { st.sent = true; st.err = ''; startWait(); render(); toast(res.message); return; }
         st.err = (res && res.message) || 'That didn\'t work.'; render();
       }, function () { st.busy = false; st.err = 'Couldn\'t reach the portal.'; render(); });
     };
-    if ($('resend')) $('resend').onclick = function () { st.sent = false; send(); };
+    if ($('resend')) $('resend').onclick = function () { st.sent = false; stopWait(); send(); };
     $('go').onclick = function () {
       if (!st.sent) { send(); return; }
       var code = $('code').value.trim(), p1 = $('n1').value.trim(), p2 = $('n2').value.trim();

@@ -18,3 +18,13 @@ var APP_URL = 'https://script.google.com/macros/s/AKfycbxH6lVXqyFvjSkERa3TkG77op
 // blank the squad labels are simply not shown.
 // ---------------------------------------------------------------------
 var SQUAD_ROTATION = { anchor: '2026-11-17', letter: 'A', on: 4, off: 4, squads: ['A', 'B'] };
+
+// ---------------------------------------------------------------------
+// WHO TO SEE WHEN AN EMAIL DOESN'T ARRIVE
+//
+// Shown on the portal's "Set up your PIN" and "Forgot PIN" screens: if
+// the code hasn't turned up after five minutes, this is who the officer
+// is told to go and see. A name is enough; it is a public page, so no
+// phone numbers or email addresses here.
+// ---------------------------------------------------------------------
+var HELP_CONTACT = 'Officer Perez';
