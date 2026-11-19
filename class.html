@@ -22,7 +22,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-19c';
+var PAGE_VERSION = '2026-11-19f';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -221,8 +221,11 @@ var PAGE_VERSION = '2026-11-19c';
   .calstrip small { display: block; margin-top: 2px; font-size: 13px; color: var(--muted); }
   .calstrip .btn { flex: none; min-height: 44px; font-size: 15px; padding: 0 16px; }
   .callink { text-decoration: none; }
-  .ctrls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: 0 0 12px; }
-  .ctrls .viewpick { flex: 1 1 210px; margin: 0; }
+  .actrow { display: flex; align-items: center; gap: 10px; width: 100%; }
+  .actrow .btn { flex: 1 1 auto; width: auto; }
+  .actrow .drop-link { flex: none; margin-left: auto; }
+  .ctrls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 14px; }
+  .ctrls .viewpick { flex: 1 1 100%; margin: 0; }
   .ctrls .squadtog { flex: 0 1 auto; margin: 0; }
   .sect { display: flex; align-items: baseline; gap: 10px; margin: 18px 2px 10px; }
   .sect .tally { flex: none; margin-left: auto; font-style: normal; font-size: 12px; font-weight: 700;
@@ -232,10 +235,21 @@ var PAGE_VERSION = '2026-11-19c';
   .whoslim { padding: 10px 12px; }
   .whoslim .picked { min-height: 48px; border-width: 1px; }
   .whoslim .note { font-size: 13px; }
-  .viewpick { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
-  .viewpick span { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 700; flex: none; }
-  .viewpick select { flex: 1; min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1.5px solid var(--line);
-    background: var(--card); color: var(--ink); font: inherit; font-size: 16px; font-weight: 600; }
+  /* The view picker. It used to sit there looking like a disabled field
+     and people walked straight past it, so it is big, navy and obviously
+     something you press. */
+  .viewpick { display: block; margin: 0 0 12px; }
+  .viewpick label { display: block; margin: 0 2px 6px; font-size: 13px; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--navy); font-weight: 700; }
+  .viewsel { position: relative; }
+  .viewpick select { -webkit-appearance: none; appearance: none; display: block; width: 100%;
+    min-height: 56px; padding: 0 46px 0 16px; border-radius: 14px; border: 2px solid var(--navy);
+    background: var(--card); color: var(--navy); font: inherit; font-size: 18px; font-weight: 700;
+    box-shadow: 0 2px 0 rgba(28, 49, 89, .14); cursor: pointer; }
+  .viewpick select:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .viewarr { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); pointer-events: none;
+    width: 26px; height: 26px; border-radius: 8px; background: var(--navy); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1; }
   /* Month grid. Only days with a session are tappable; tapping one opens
      that day underneath, so signing up works exactly as it does in the
      other two views. */
@@ -407,7 +421,7 @@ function start() {
   if (!device) { device = String(Date.now()) + Math.random().toString(36).slice(2, 10); store.set('ci-device', device); }
   var meKey = 'ci-class-me-' + DATA.c;
   // In-Service: list the dates by topic (default) or all by date. Remembered on this phone.
-  var SORTS = { grid: 'Grid', topic: 'By topic', date: 'By date', cal: 'By calendar' };
+  var SORTS = { grid: 'Grid \u2014 every week at once', topic: 'By topic', date: 'By date', cal: 'By calendar' };
   var sortBy = SORTS[store.get('ci-class-sort')] ? store.get('ci-class-sort') : '';
   var calDay = '';    // a day with several sessions, opened to choose one
   var calMonth = '';  // the month on screen, 'YYYY-MM'
@@ -534,15 +548,15 @@ function start() {
   function calFileName() {
     return (st.cls.title || 'training').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() + '.ics';
   }
-  function addToCalendar() {
-    var list = myDates();
+  function addToCalendar(only) {
+    var list = only && only.length ? only : myDates();
     if (!list.length) { toast('You haven\'t got any dates yet.', true); return; }
     var text = icsText(list);
     try {
       var blob = new Blob([text], { type: 'text/calendar;charset=utf-8' });
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
-      a.href = url; a.download = calFileName();
+      a.href = url; a.download = list.length === 1 ? calFileOne(list[0]) : calFileName();
       document.body.appendChild(a); a.click();
       setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 2000);
     } catch (e) {
@@ -551,6 +565,10 @@ function start() {
       window.location.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(text);
     }
     toast(list.length === 1 ? 'Opening your calendar\u2026' : 'Opening your calendar with all ' + list.length + ' dates\u2026');
+  }
+  // One date downloads as its own file, named for its topic.
+  function calFileOne(d) {
+    return ((d.topic || st.cls.title || 'training')).replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase() + '.ics';
   }
   // One date, straight into Google Calendar.
   function googleCalUrl(d) {
@@ -755,10 +773,11 @@ function start() {
     html += '<div class="ctrls">';
     if (canPick) {
       if (!isIS() && sortBy === 'topic') sortBy = 'date';
-      html += '<div class="viewpick"><span>Show</span><select id="sortsel" aria-label="How to show the dates">' +
+      html += '<div class="viewpick"><label for="sortsel">Show</label>' +
+        '<div class="viewsel"><select id="sortsel">' +
         Object.keys(SORTS).filter(function (k) { return isIS() || (k !== 'topic' && k !== 'grid'); }).map(function (k) {
           return '<option value="' + k + '"' + (sortBy === k ? ' selected' : '') + '>' + SORTS[k] + '</option>';
-        }).join('') + '</select></div>';
+        }).join('') + '</select><span class="viewarr" aria-hidden="true">\u25BE</span></div></div>';
     }
     if (rota() && (canPick || c.dates.length > 1)) {
       html += '<label class="squadtog"><input type="checkbox" id="squadtog"' + (showSquads() ? ' checked' : '') +
@@ -1235,10 +1254,11 @@ function start() {
       var confirmKey = function (op) { return op + '|' + d.id; };
       if (seatHere) {
         b = '<span class="state ok">You\'re signed up for this date.</span>' +
-          '<a class="drop-link callink" target="_blank" rel="noopener" href="' + googleCalUrl(d) + '">Add to Google Calendar</a>' +
           (st.confirm === confirmKey('drop')
             ? '<button type="button" class="btn warn" data-op="drop" data-d="' + d.id + '"' + (busy ? ' disabled' : '') + '>Tap again to drop out</button>'
-            : '<button type="button" class="drop-link" data-op="drop" data-d="' + d.id + '">Drop out</button>');
+            : '<div class="actrow">' +
+                '<button type="button" class="btn ghost" data-cal1="' + d.id + '">Add to my calendar</button>' +
+                '<button type="button" class="drop-link" data-op="drop" data-d="' + d.id + '">Drop out</button></div>');
       } else if (waitHere && left > 0) {
         // A seat opened: the first one on the waitlist to claim it gets it.
         b = '<span class="state ok" style="flex:1 1 100%">A seat is open! The first person on the waitlist to claim it gets it.</span>' +
@@ -1753,6 +1773,11 @@ function start() {
     if (b.id === 'change') { st.me = null; calPick = {}; gridOpen = ''; drawDone(); st.confirm = ''; st.pin = ''; st.email = ''; store.set(meKey, ''); store.set('ci-class-me', ''); render(); var q = $('q'); if (q) q.focus(); return; }
     if (b.id === 'refresh') { refresh(false); return; }
     if (b.id === 'addcal') { addToCalendar(); return; }
+    if (b.dataset.cal1) {
+      var one = st.cls.dates.filter(function (x) { return x.id === b.dataset.cal1; })[0];
+      if (one) addToCalendar([one]);
+      return;
+    }
     if (b.id === 'forget') { savePass(''); st.pin = ''; render(); toast('This phone forgot your PIN.'); return; }
     if (b.dataset.op) { act(b.dataset.op, b.dataset.d); return; }
     if (b.dataset.calday) { calTap(b.dataset.calday); render(); return; }
@@ -1798,7 +1823,7 @@ function start() {
   app.addEventListener('change', function (e) {
     if (e.target.id === 'squadtog') { store.set('ci-class-squads', e.target.checked ? 'on' : 'off'); render(); return; }
     if (e.target.id !== 'sortsel') return;
-    sortBy = e.target.value; store.set('ci-class-sort', sortBy); render();
+    sortBy = e.target.value; store.set('ci-class-sort', sortBy); gridOpen = ''; calDay = ''; render();
   });
   app.addEventListener('input', function (e) { if (e.target.id === 'q') drawDrop(); });
   app.addEventListener('keydown', function (e) {
