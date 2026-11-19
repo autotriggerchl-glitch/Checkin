@@ -1172,7 +1172,7 @@ function start() {
     };
     ov.innerHTML = '<div class="pincard">' +
       (isNew
-        ? '<h2 class="pint">Set up your sign-ups</h2><p class="note">Give your email and make up a 4-digit PIN. It\'s one PIN for all your class sign-ups: ' +
+        ? '<h2 class="pint">Set up your sign-ups</h2><p class="note">Make up a 4-digit PIN. It\'s one PIN for all your class sign-ups: ' +
             'you\'ll use it to sign up or make changes from any phone or computer. This phone will remember it. ' +
             'You\'ll get an email when you sign up or make a change, with an "add to calendar" link, and a reminder the day before.</p>' +
           '<label class="pinf"><span>Email</span><input id="pin-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com"></label>' +
@@ -1180,18 +1180,40 @@ function start() {
         : '<h2 class="pint">Enter your PIN</h2><p class="note">The 4-digit PIN you made the first time you signed up for a class. This phone will remember it.</p>' +
           pinBox('pin-1', 'PIN')) +
       '<p class="pin-err" id="pin-err" role="alert">' + esc(mode === 'new' && !message ? '' : message || '') + '</p>' +
-      (isNew ? '' : '<button type="button" class="link" id="pin-forgot">Forgot your PIN? Email me a temporary PIN</button>' +
+      (isNew ? '' : '<p class="note" id="pin-where">Checking where a code would go\u2026</p>' +
+        '<button type="button" class="link" id="pin-forgot">Forgot your PIN? Email me a temporary PIN</button>' +
         '<p class="note" id="pin-forgot-msg" hidden>' + (mode === 'locked' ? 'Tap the link above for a temporary PIN by email, or wait 15 minutes.' : '') + '</p>') +
       '<div class="pinbtns"><button type="button" class="btn ghost" id="pin-cancel">Cancel</button>' +
         '<button type="button" class="btn" id="pin-go"' + (mode === 'locked' ? ' disabled' : '') + '>' + (isNew ? 'Save and sign up' : 'Continue') + '</button></div>' +
       '</div>';
     if (mode === 'locked') $('pin-forgot-msg').hidden = false;
+    if (!isNew) pinWhere();
     ov.hidden = false;
     var first = $(isNew ? 'pin-email' : 'pin-1');
     if (first) setTimeout(function () { first.focus(); }, 50);
   }
 
-  // Forgot the PIN: a temporary one goes to the email they gave with it.
+  // A temporary PIN goes to the Employee Directory address, so say which
+  // one that is before anyone taps Forgot. Someone whose Directory entry
+  // has no email finds out here, instead of waiting for an email that
+  // was never going to come.
+  function pinWhere() {
+    if (!st.me) return;
+    api('pinWhere', { name: st.me.name, call: st.me.call }).then(function (res) {
+      var el = $('pin-where'), btn = $('pin-forgot');
+      if (!el) return;
+      if (res && res.ok && res.masked) {
+        el.innerHTML = 'Forgotten it? We\'ll email a code to <b>' + esc(res.masked) + '</b>.';
+      } else if (res && res.none) {
+        el.innerHTML = esc(res.message || 'We have no email for you.');
+        if (btn) btn.hidden = true;   // nothing to send to
+      } else {
+        el.hidden = true;
+      }
+    }, function () { var el = $('pin-where'); if (el) el.hidden = true; });
+  }
+
+  // Forgot the PIN: a temporary one goes to the Employee Directory email.
   function forgotPin() {
     var msg = $('pin-forgot-msg'), btn = $('pin-forgot');
     if (!msg || !st.me || btn.disabled) return;
