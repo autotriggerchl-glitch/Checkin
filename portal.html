@@ -24,7 +24,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-19h';
+var PAGE_VERSION = '2026-11-19i';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -962,9 +962,9 @@ var PAGE_VERSION = '2026-11-19h';
   function waitNote() {
     return st.waited
       ? '<p class="helpnote late"><b>Still nothing?</b> The department\'s mail filter blocks these for some people. ' +
-          'See <b>' + esc(HELP_WHO) + '</b> and you can be set up by hand.</p>'
+          'Reach out to <b>' + esc(HELP_WHO) + '</b> and you can be set up by hand.</p>'
       : '<p class="helpnote">It usually lands in under a minute. <b>Check your junk mail.</b> ' +
-          'If there\'s nothing after 5 minutes, see ' + esc(HELP_WHO) + '.</p>';
+          'If there\'s nothing after 5 minutes, reach out to ' + esc(HELP_WHO) + '.</p>';
   }
 
   // ---------- Sign in ----------
