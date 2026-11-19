@@ -34,6 +34,7 @@
   .note { color: var(--muted); font-size: 15.5px; margin: 0; }
   .err { color: var(--err); font-weight: 600; font-size: 15px; min-height: 1.3em; margin: 10px 0 0; }
   .link { border: 0; background: none; color: var(--focus); font-weight: 700; padding: 8px 2px; cursor: pointer; font-size: 15px; }
+  .link:disabled { color: var(--muted); cursor: default; }
   .btn { min-height: 50px; padding: 0 18px; border: 0; border-radius: 10px; background: var(--navy); color: #fff; font-size: 17px; font-weight: 700; cursor: pointer; width: 100%; }
   @media (prefers-color-scheme: dark) { .btn { background: #2B4677; } }
   .btn.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
@@ -185,7 +186,7 @@
   // The same pass the class sign-up page uses, so classes open already signed in.
   function passes() { try { return JSON.parse(store.get('ci-pass') || '{}') || {}; } catch (e) { return {}; } }
   function savePass(me, token) { var all = passes(), k = me.name + '|' + me.call; if (token) all[k] = token; else delete all[k]; store.set('ci-pass', JSON.stringify(all)); }
-  var st = { email: store.get('portal-email') || '', me: null, token: store.get('portal-token') || '', data: null, step: 'login', err: '', busy: false };
+  var st = { email: store.get('portal-email') || '', me: null, token: store.get('portal-token') || '', data: null, step: 'login', err: '', busy: false, forgot: 0, forgotMsg: '' };
   try { st.me = JSON.parse(store.get('portal-me') || 'null'); } catch (e) {}
 
   var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -783,15 +784,29 @@
       '<label class="field"><span>PIN</span><input type="password" class="pin" id="p1" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password"></label>' +
       '<p class="err" id="err">' + esc(st.err) + '</p>' +
       '<div class="btns"><button type="button" class="btn" id="go"' + (st.busy ? ' disabled' : '') + '>' + (st.busy ? 'Checking…' : 'Sign in') + '</button></div>' +
-      '<div class="row2"><button type="button" class="link" id="first">First time? Set up your PIN</button><button type="button" class="link" id="forgot">Forgot PIN?</button></div></div>';
+      '<div class="row2"><button type="button" class="link" id="first">First time? Set up your PIN</button>' +
+        '<button type="button" class="link" id="forgot"' + (st.forgot ? ' disabled' : '') + '>' + (st.forgot ? 'Sending\u2026' : 'Forgot PIN?') + '</button></div>' +
+      (st.forgotMsg ? '<p class="note" id="forgotmsg" style="margin-top:10px">' + st.forgotMsg + '</p>' : '') + '</div>';
     $('p1').oninput = function () { this.value = this.value.replace(/\D/g, '').slice(0, 4); };
     app.onkeydown = function (e) { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); login(); } };
     $('go').onclick = login;
     $('first').onclick = function () { st.email = $('em').value.trim().toLowerCase(); if (!okEmail()) return; st.step = 'setup'; st.sent = false; st.err = ''; render(); };
+    // This used to fire on the tap with nothing to show for it, so people
+    // tapped again and again and got an email for every tap.
     $('forgot').onclick = function () {
+      if (st.forgot) return;
       st.email = $('em').value.trim().toLowerCase(); if (!okEmail()) return;
-      api('portalForgot', { email: st.email }).then(function (res) { st.err = ''; render(); toast((res && res.message) || 'That didn\'t work.', !(res && res.ok)); },
-        function () { toast('Couldn\'t reach the portal.', true); });
+      st.forgot = 1; st.forgotMsg = ''; st.err = ''; render();
+      api('portalForgot', { email: st.email }).then(function (res) {
+        st.forgot = 0;
+        st.forgotMsg = esc((res && res.message) || 'That didn\'t work.');
+        render();
+        toast((res && res.message) || 'That didn\'t work.', !(res && res.ok));
+      }, function () {
+        st.forgot = 0;
+        st.forgotMsg = 'Couldn\'t reach the portal. Check your signal and try again.';
+        render();
+      });
     };
     setTimeout(function () { var f = st.email ? $('p1') : $('em'); if (f) f.focus(); }, 50);
   }
