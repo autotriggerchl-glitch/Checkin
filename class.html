@@ -22,7 +22,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-18a';
+var PAGE_VERSION = '2026-11-18b';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -491,7 +491,7 @@ function start() {
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'donebar'; bar.className = 'donebar';
-      bar.innerHTML = '<div><p>Finished picking? We\'ll email you one list of all your dates.</p>' +
+      bar.innerHTML = '<div><p id="donesay"></p>' +
         '<button type="button" class="btn" id="done-go">Done</button></div>';
       document.body.appendChild(bar);
       bar.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('#done-go')) finish(); });
@@ -499,6 +499,9 @@ function start() {
     var show = isDirty();
     bar.hidden = !show;
     document.body.classList.toggle('hasdone', show);
+    var say = $('donesay');
+    if (say) say.textContent = isIS() ? 'Finished picking? Tap Done to save your dates.'
+      : 'Finished picking? We\'ll email you one list of all your dates.';
     var b = $('done-go');
     if (b) { b.disabled = !!st.finishing; b.textContent = st.finishing ? 'Sending…' : 'Done'; }
   }
@@ -784,11 +787,47 @@ function start() {
       (left.length
         ? '<p class="note" style="margin:0">You\'d still need <b>' + esc(andList(left)) + '</b>.</p>' +
           '<p class="note" style="margin:10px 0 0">You don\'t have to do it all now \u2014 you can come back and pick the rest any time' + until + '.</p>'
-        : '<p class="note" style="margin:0">That\'s <b>all ' + (st.cls.topics || []).length + ' topics</b>. When you\'re finished, tap <b>Done</b> and we\'ll email you the list.</p>') +
+        : '<p class="note" style="margin:0">That\'s <b>all ' + (st.cls.topics || []).length + ' topics</b>. When you\'re finished, tap <b>Done</b> to save them.</p>') +
       '<div class="pinbtns"><button type="button" class="btn ghost" id="cal-keep">Keep picking</button>' +
         '<button type="button" class="btn" id="cal-go">Sign up</button></div></div>';
     ov.hidden = false;
     setTimeout(function () { var k = $('cal-go'); if (k) k.focus(); }, 50);
+  }
+
+  // In-Service doesn't email anybody, so this is where they're told where
+  // their dates live - and how to keep the portal one tap away.
+  function doneSaved() {
+    var left = isIS() ? (st.cls.topics || []).filter(function (g) { return !myStatus(g).seat; }) : [];
+    var ov = $('doneov');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'doneov'; ov.className = 'pinov';
+      ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'done-t');
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('button');
+        if (e.target === ov || (b && b.id === 'done-ok')) ov.hidden = true;
+      });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !ov.hidden) ov.hidden = true; });
+    }
+    var purl = location.pathname.replace(/[^/]*$/, 'portal.html');
+    var ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    var until = st.cls.deadline ? ' until <b>' + esc(day(st.cls.deadline)) + '</b>' : '';
+    ov.innerHTML = '<div class="pincard">' +
+      '<h2 class="pint" id="done-t">Saved</h2>' +
+      '<p class="note" style="margin:0">Your dates are saved. In-Service doesn\'t send sign-up emails — ' +
+        'check your dates any time on the <a href="' + purl + '">Officer Portal</a>.</p>' +
+      (left.length
+        ? '<p class="note" style="margin:10px 0 0;padding:10px 12px;background:#FFF4D6;color:#7A5200;border-radius:8px">' +
+            'You still need <b>' + esc(andList(left)) + '</b>. You can come back and pick the rest any time' + until + '.</p>'
+        : '<p class="note" style="margin:10px 0 0;padding:10px 12px;background:#E5F3EB;color:#1E7A4C;border-radius:8px">' +
+            'That\'s every topic. You\'re all set.</p>') +
+      '<p class="note" style="margin:12px 0 0"><b>Keep it one tap away:</b> open the portal, then ' +
+        (ios ? 'tap <b>Share</b> and <b>Add to Home Screen</b>.' : 'tap the <b>⋮</b> menu and <b>Add to Home screen</b>.') +
+        ' It sits on your phone like an app, so you can check your dates without digging for the link.</p>' +
+      '<div class="pinbtns"><button type="button" class="btn" id="done-ok">Got it</button></div></div>';
+    ov.hidden = false;
+    setTimeout(function () { var k = $('done-ok'); if (k) k.focus(); }, 50);
   }
 
   function calConfirm() {
@@ -1149,11 +1188,17 @@ function start() {
         }
         // A right PIN: this phone remembers it from now on.
         if (res.token) { savePass(res.token); st.pin = ''; st.email = ''; }
-        if (j.op === 'done') { setDirty(false); drawDone(); toast(res.message || 'Done!'); }
+        var saved = false;
+        if (j.op === 'done') {
+          setDirty(false); drawDone();
+          if (isIS() || (res && res.noEmail)) saved = true; else toast(res.message || 'Done!');
+        }
         if (!st.queue.length) {
           st.cls = res.cls; st.today = res.today || st.today;
           if (!(document.activeElement && document.activeElement.id === 'q')) render();
         }
+        // After the fresh class lands, so "you still need" is up to date.
+        if (saved) doneSaved();
         pump();
       })
       .withFailureHandler(function () {
