@@ -22,7 +22,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-19k';
+var PAGE_VERSION = '2026-11-23a';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -906,7 +906,7 @@ function start() {
           return '<button type="button" class="calpickrow' + (calPick[d.id] ? ' on' : '') + (mineHere ? ' mine' : '') +
             '" data-calsel="' + d.id + '"><span>' +
             (isIS() ? esc(d.topic) : esc(day(d.date))) +
-            '<small>' + esc(times(d)) + ' \u00b7 ' + (left > 0 ? left + (left === 1 ? ' seat left' : ' seats left') : 'Full' + (d.wait.length && !isIS() ? ' \u00b7 ' + d.wait.length + ' waiting' : '')) + '</small>' +
+            '<small>' + esc(times(d)) + ' \u00b7 ' + (d.shut ? 'Full' : left > 0 ? left + (left === 1 ? ' seat left' : ' seats left') : 'Full' + (d.wait.length && !isIS() ? ' \u00b7 ' + d.wait.length + ' waiting' : '')) + '</small>' +
             '<small class="calwho">' + who + '</small></span>' +
             '<em>' + (mineHere ? '\u2713 Booked' : calPick[d.id] ? 'Picked' : 'Pick') + '</em></button>';
         }).join('');
@@ -981,7 +981,7 @@ function start() {
         return x && x.topic === g;
       })) return;
       var list = plan.cells[g + '\u0000' + w] || [];
-      var open = list.filter(function (d) { return d.seats - d['in'].length > 0 && !d.started && d.date >= st.today; })[0];
+      var open = list.filter(function (d) { return !d.shut && d.seats - d['in'].length > 0 && !d.started && d.date >= st.today; })[0];
       if (open) out.push(open);
     });
     return out;
@@ -1017,10 +1017,10 @@ function start() {
         var left = d.seats - d['in'].length, mineHere = m.seat === d, waitHere = m.wait && m.wait.d === d;
         var picked = !!calPick[d.id], past = d.date < st.today || !!d.started;
         var state = mineHere ? '\u2713 Yours' : picked ? 'Picked' : waitHere ? 'Waitlist'
-          : past ? 'Past' : left > 0 ? left + ' left' : 'Full';
+          : past ? 'Past' : d.shut ? 'Full' : left > 0 ? left + ' left' : 'Full';
         var sq = showSquads() ? squadOff(d.date) : '';
         html += '<button type="button" class="gcell' +
-          (mineHere ? ' got' : '') + (picked ? ' pick' : '') + ((!mineHere && !picked && (left <= 0 || past)) ? ' full' : '') +
+          (mineHere ? ' got' : '') + (picked ? ' pick' : '') + ((!mineHere && !picked && (left <= 0 || past || d.shut)) ? ' full' : '') +
           (gridOpen === d.id ? ' sel' : '') + '" data-gcell="' + d.id + '"' +
           ' aria-pressed="' + picked + '" aria-label="' + esc(g + ', ' + day(d.date) + ', ' + state) + '">' +
           '<b>' + esc(shortDay(d.date)) + '</b><small>' + esc(state) + '</small>' +
@@ -1217,6 +1217,7 @@ function start() {
         (st.me && !closed ? ' Pick another date.' : '') + '</p></div>';
     }
     var chip = past ? '<span class="seats past">' + (d.date < st.today ? 'Past' : 'Started') + '</span>'
+      : d.shut ? '<span class="seats full">Full</span>'
       : left <= 0 ? '<span class="seats full">Full' + (d.wait.length && !isIS() ? ' · ' + d.wait.length + ' waiting' : '') + '</span>'
       : d.wait.length && !isIS() ? '<span class="seats">' + left + (left === 1 ? ' seat' : ' seats') + ' open · for the waitlist</span>'
       : '<span class="seats">' + left + (left === 1 ? ' seat' : ' seats') + ' left</span>';
@@ -1243,6 +1244,13 @@ function start() {
 
     // Buttons, for the person picked, while sign-ups are open.
     var rpNow = hasRp() && st.me ? rpOf(d) : { seat: false, wait: -1 };
+    if (d.shut && !seatHere && !waitHere) {
+      // Closed by the training officer, seats or no seats.
+      html += '<div class="acts"><span class="donote">' +
+        esc(d.shutWhy || 'This date is full.') +
+        (st.me && !closed && !past ? ' Pick another date.' : '') + '</span></div></div>';
+      return html;
+    }
     if (st.me && !closed && !past && doneMe() && !seatHere && !waitHere) {
       if (!(rpNow.seat || rpNow.wait >= 0)) html += '<div class="acts"><span class="donote">You\'ve already taken this training.' + ((d.rpSeats || 0) > 0 ? ' Sign up as a role player below.' : '') + '</span></div>';
       else html += '<div style="height:4px"></div>';
@@ -1791,6 +1799,10 @@ function start() {
     if (b.dataset.calday) { calTap(b.dataset.calday); render(); return; }
     if (b.dataset.calsel) {
       var dsel = st.cls.dates.filter(function (x) { return x.id === b.dataset.calsel; })[0];
+      if (dsel && dsel.shut && !dsel['in'].some(isMe)) {
+        toast(dsel.shutWhy || 'That date is full.');
+        return;
+      }
       if (dsel) { calPickOne(dsel); render(); }
       return;
     }
@@ -1807,7 +1819,7 @@ function start() {
         var gPast = gd.date < st.today || !!gd.started;
         // A free seat is picked as well as opened. A full one just opens,
         // so they can join its waitlist from the card underneath.
-        if (st.me && !closedReason() && !gMine && !gPast && (gLeft > 0 || calPick[gd.id])) calPickOne(gd);
+        if (st.me && !closedReason() && !gMine && !gPast && !gd.shut && (gLeft > 0 || calPick[gd.id])) calPickOne(gd);
         render();
       }
       return;
