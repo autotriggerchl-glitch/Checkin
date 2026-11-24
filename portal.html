@@ -24,7 +24,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-24a';
+var PAGE_VERSION = '2026-11-24b';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -172,8 +172,12 @@ var PAGE_VERSION = '2026-11-24a';
   .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
   .tag { padding: 2px 8px; border-radius: 6px; background: var(--field); font-size: 13px; font-weight: 700; }
   .tag.ok { background: var(--okbg); color: var(--ok); }
-  .todo { margin: 8px 0 0; padding: 7px 10px; border-radius: 8px; background: var(--waitbg); color: var(--wait); font-size: 13.5px; line-height: 1.45; }
-  .todo b { font-weight: 800; }
+  /* Topic names run long, so one per line with a bullet beats a comma list. */
+  .todo { margin: 8px 0 0; padding: 9px 12px; border-radius: 8px; background: var(--waitbg); color: var(--wait); font-size: 13.5px; line-height: 1.45; }
+  .todo b { display: block; margin: 0 0 5px; font-weight: 800; }
+  .todo ul { margin: 0; padding: 0; list-style: none; }
+  .todo li { position: relative; padding: 2px 0 2px 15px; }
+  .todo li::before { position: absolute; left: 2px; top: 2px; content: "\2022"; font-weight: 800; }
   .tag.rp { background: #E6EBF3; color: var(--navy); }
   @media (prefers-color-scheme: dark) { .tag.rp { background: #22324F; color: #C9D6EE; } } .tag.wait { background: var(--waitbg); color: var(--wait); } .tag.closed { background: var(--errbg); color: var(--err); }
   .when { margin: 8px 0 0; font-size: 15px; color: var(--muted); }
@@ -888,7 +892,8 @@ var PAGE_VERSION = '2026-11-24a';
       '<div class="tags">' + tags.join('') + '</div>' +
       (rows.length ? '<ul class="dts">' + rows.join('') + '</ul>' : '') +
       (owed.length && !c.closed && !c.cancelled
-        ? '<p class="todo"><b>' + owed.length + (owed.length === 1 ? ' topic' : ' topics') + ' still to pick:</b> ' + esc(owed.join(', ')) + '</p>' : '') +
+        ? '<div class="todo"><b>' + owed.length + (owed.length === 1 ? ' topic' : ' topics') + ' still to pick</b>' +
+          '<ul>' + owed.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul></div>' : '') +
       (rows.length && !(c.deadline && !c.closed) ? '' :
         '<p class="when">' + (rows.length ? '' : esc([range, c.location].filter(Boolean).join(' · '))) +
           (c.deadline && !c.closed ? (rows.length ? '' : '<br>') + 'Sign up by ' + esc(md(c.deadline)) : '') + '</p>') + '</a>';
