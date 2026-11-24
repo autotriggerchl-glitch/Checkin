@@ -24,7 +24,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-24d';
+var PAGE_VERSION = '2026-11-24e';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -282,9 +282,22 @@ var PAGE_VERSION = '2026-11-24d';
     get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set: function (k, v) { try { if (v === '' || v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
   };
-  function api(name, arg) {
+  // When everyone is on at once the project's lock gives up waiting and
+  // says so rather than doing the work. Nothing has happened at that
+  // point, so try again - spread out, so a room full of phones doesn't
+  // retry together.
+  var BUSY_RE = /lots of people|busy\.?\s*tap again|tap again/i;
+  function api(name, arg, tries) {
+    tries = tries || 0;
     return fetch(APP_URL, { method: 'POST', body: JSON.stringify({ pub: name, arg: arg || {} }) })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (res) {
+        if (res && res.ok === false && !res.gone && !res.pin && BUSY_RE.test(String(res.message || '')) && tries < 4) {
+          var wait = 500 * Math.pow(1.9, tries) + Math.random() * 900;
+          return new Promise(function (go) { setTimeout(go, wait); }).then(function () { return api(name, arg, tries + 1); });
+        }
+        return res;
+      });
   }
   // The same pass the class sign-up page uses, so classes open already signed in.
   function passes() { try { return JSON.parse(store.get('ci-pass') || '{}') || {}; } catch (e) { return {}; } }

@@ -22,7 +22,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-23a';
+var PAGE_VERSION = '2026-11-24e';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -379,9 +379,23 @@ var PAGE_VERSION = '2026-11-23a';
 // (APP_URL is in config.js).
 var DATA = null;
 var FN = { ciSubmit: 'checkinSubmit', ciClassSignup: 'classSignup', ciClassState: 'classState' };
-function api(name, arg) {
+// Everyone signing up at once makes the project's lock give up waiting,
+// and it says so instead of doing the work. Nothing has happened when
+// that comes back, so the page just tries again by itself - spread out,
+// so a room full of phones doesn't retry in lockstep. The officer never
+// sees it unless every try fails.
+var BUSY_RE = /lots of people|busy\.?\s*tap again|tap again/i;
+function api(name, arg, tries) {
+  tries = tries || 0;
   return fetch(APP_URL, { method: 'POST', body: JSON.stringify({ pub: name, arg: arg }) })
-    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function (res) {
+      if (res && res.ok === false && !res.gone && BUSY_RE.test(String(res.message || '')) && tries < 4) {
+        var wait = 500 * Math.pow(1.9, tries) + Math.random() * 900;
+        return new Promise(function (go) { setTimeout(go, wait); }).then(function () { return api(name, arg, tries + 1); });
+      }
+      return res;
+    });
 }
 function runner(ok, fail) {
   var r = {
