@@ -24,7 +24,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-24c';
+var PAGE_VERSION = '2026-11-24d';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -345,17 +345,24 @@ var PAGE_VERSION = '2026-11-24c';
     var d = st.data, me = d.me;
     if (!st.tab) st.tab = store.get('portal-tab') || 'home';
     var P = sortOut(d);
-    var tabs = [['home', 'Home', P.needs.length], ['tasks', 'Tasks', P.tasksOpen.length], ['training', 'Training', P.trainNeeds], ['bids', 'Bids', P.bidsOpen.length]];
-    if (!tabs.some(function (t) { return t[0] === st.tab; })) st.tab = 'home';
+    // A retiree gets classes and nothing else: no Home, no Tasks, and no
+    // shift bids. The relay doesn't send them either, so there is nothing
+    // here to hide - this only keeps the page from offering empty tabs.
+    var ret = !!(d.retiree || (me && me.retiree));
+    var tabs = ret ? [['training', 'Training', P.trainNeeds]]
+      : [['home', 'Home', P.needs.length], ['tasks', 'Tasks', P.tasksOpen.length], ['training', 'Training', P.trainNeeds], ['bids', 'Bids', P.bidsOpen.length]];
+    if (!tabs.some(function (t) { return t[0] === st.tab; })) st.tab = tabs[0][0];
     app.innerHTML =
-      '<div class="acct"><span class="av">' + esc(initials(me.name)) + '</span><div><b>' + esc(me.name) + '</b><small>' + esc([me.call, d.email].filter(Boolean).join(' · ')) + '</small></div>' +
+      '<div class="acct"><span class="av">' + esc(initials(me.name)) + '</span><div><b>' + esc(me.name) + '</b><small>' + esc([ret ? 'Retired' : me.call, d.email].filter(Boolean).join(' · ')) + '</small></div>' +
         '<button type="button" class="acct-btn" id="acct" aria-haspopup="true">Account <span aria-hidden="true">▾</span></button></div>' +
-      '<nav class="tabs" role="tablist">' + tabs.map(function (t) {
+      (ret ? '' : '<nav class="tabs" role="tablist">' + tabs.map(function (t) {
         return '<button type="button" role="tab" data-tab="' + t[0] + '" aria-selected="' + (st.tab === t[0]) + '">' + esc(t[1]) +
           (t[2] ? '<em' + (t[0] === 'home' ? ' class="hot"' : '') + '>' + t[2] + '</em>' : '') + '</button>';
-      }).join('') + '</nav>' +
+      }).join('') + '</nav>') +
       '<div class="pane">' + (st.tab === 'tasks' ? tasksPane(P) : st.tab === 'training' ? trainingPane(P) : st.tab === 'bids' ? bidsPane(P) : homePane(P)) + '</div>' +
-      '<div class="foot"><span>Your bids are private: only you and the administrators see them.</span><button type="button" class="link" id="refresh">Refresh</button></div>';
+      '<div class="foot"><span>' + (ret ? 'Only you and the training office see your sign-ups.'
+        : 'Your bids are private: only you and the administrators see them.') + '</span>' +
+        '<button type="button" class="link" id="refresh">Refresh</button></div>';
     wire();
   }
 
