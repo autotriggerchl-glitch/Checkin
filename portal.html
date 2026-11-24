@@ -24,7 +24,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-24b';
+var PAGE_VERSION = '2026-11-24c';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -387,10 +387,33 @@ var PAGE_VERSION = '2026-11-24b';
       else P.soon.push({ at: '9', text: b.title + ': your bid is in', sub: 'Bids close ' + when(b.closes), tab: 'bids', id: 'bd-' + b.id });
     });
     P.classesMine.forEach(function (c) {
+      // Signed up isn't finished. In-Service is one date per topic, so
+      // two of five still needs you - and the closer the deadline, the
+      // higher up it belongs.
+      var need = c.kind === 'inservice' ? (c.topics || []).length : 0;
+      if (need && !c.closed) {
+        var picked = {};
+        (c.seats || []).concat(c.waits || []).forEach(function (s) { if (s.topic) picked[s.topic] = 1; });
+        var owed = (c.topics || []).filter(function (t) { return !picked[t]; });
+        if (owed.length) {
+          var dd = c.deadline ? dayDiff(c.deadline) : null;
+          add(dd == null ? 5 : dd < 0 ? 0 : dd <= 7 ? 2 : 5,
+            dd == null ? '' : dd < 0 ? 'bad' : dd <= 7 ? 'warn' : '',
+            c.title + ': ' + owed.length + (owed.length === 1 ? ' topic' : ' topics') + ' still to pick',
+            dd == null ? owed.join(', ')
+              : dd < 0 ? 'Sign-ups closed ' + md(c.deadline)
+              : dd === 0 ? 'Sign up by the end of today'
+              : 'Sign up by ' + md(c.deadline) + ' · ' + dd + (dd === 1 ? ' day left' : ' days left'),
+            'training', 'cl-' + c.c);
+        }
+      }
       (c.seats || []).forEach(function (s) {
+        // The class's own location describes the whole class ("M/T/W/T
+        // Lynnfield MPTC. Fridays Chelsea PD"), which buries the date.
+        // This row is one date, so it wants that date's location.
         P.soon.push({ at: s.date + (s.start || ''),
           text: s.topic || c.title,
-          sub: [s.topic ? c.title : '', md(s.date) + (s.start ? ' at ' + s.start : ''), c.location].filter(Boolean).join(' · '),
+          sub: [s.topic ? '' : c.title, md(s.date) + (s.start ? ' at ' + s.start : ''), s.location || ''].filter(Boolean).join(' · '),
           tab: 'training', id: 'cl-' + c.c });
       });
     });
