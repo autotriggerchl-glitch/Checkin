@@ -24,7 +24,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-19l';
+var PAGE_VERSION = '2026-11-24a';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -164,12 +164,16 @@ var PAGE_VERSION = '2026-11-19l';
   @media (prefers-color-scheme: dark) { .chc.on { border-color: #6FA2F5; } .chc.on select { background: #2B4677; border-color: #6FA2F5; } }
   a.cls { display: block; text-decoration: none; color: inherit; background: var(--card); border-radius: 10px; padding: 14px 16px; margin: 0 0 12px; box-shadow: 0 1px 0 rgba(20, 40, 75, .12); }
   a.cls.mine { border-left: 5px solid var(--ok); }
+  /* Part-way through In-Service: not green, because it isn't finished. */
+  a.cls.part { border-left: 5px solid var(--wait); }
   .ct { display: flex; align-items: flex-start; gap: 10px; }
   .ct b { flex: 1; font-size: 18px; line-height: 1.25; }
   .ct .chev { color: var(--muted); font-size: 22px; line-height: 1; }
   .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
   .tag { padding: 2px 8px; border-radius: 6px; background: var(--field); font-size: 13px; font-weight: 700; }
   .tag.ok { background: var(--okbg); color: var(--ok); }
+  .todo { margin: 8px 0 0; padding: 7px 10px; border-radius: 8px; background: var(--waitbg); color: var(--wait); font-size: 13.5px; line-height: 1.45; }
+  .todo b { font-weight: 800; }
   .tag.rp { background: #E6EBF3; color: var(--navy); }
   @media (prefers-color-scheme: dark) { .tag.rp { background: #22324F; color: #C9D6EE; } } .tag.wait { background: var(--waitbg); color: var(--wait); } .tag.closed { background: var(--errbg); color: var(--err); }
   .when { margin: 8px 0 0; font-size: 15px; color: var(--muted); }
@@ -850,13 +854,25 @@ var PAGE_VERSION = '2026-11-19l';
     var tags = [];
     if (c.category) tags.push('<span class="tag">' + esc(c.category) + '</span>');
     var rpS = c.rpSeats || [], rpW = c.rpWaits || [];
-    if (c.seats.length) tags.push('<span class="tag ok">✓ Signed up</span>');
+    // In-Service is a set of topics with one date each, so "Signed up"
+    // on its own reads as finished when you've picked two out of five.
+    // Say how many, and name the ones still to pick.
+    var need = c.kind === 'inservice' ? (c.topics || []).length : 0;
+    var picked = {};
+    c.seats.forEach(function (s) { if (s.topic) picked[s.topic] = 1; });
+    (c.waits || []).forEach(function (s) { if (s.topic) picked[s.topic] = 1; });
+    var owed = need ? (c.topics || []).filter(function (t) { return !picked[t]; }) : [];
+    var got = need ? need - owed.length : 0;
+    if (need) tags.push(owed.length
+      ? '<span class="tag wait">' + got + ' of ' + need + ' topics</span>'
+      : '<span class="tag ok">✓ All ' + need + ' topics</span>');
+    else if (c.seats.length) tags.push('<span class="tag ok">✓ Signed up</span>');
     if (c.waits.length) tags.push('<span class="tag wait">Waitlist</span>');
     if (rpS.length) tags.push('<span class="tag ok">✓ Role player</span>');
     if (rpW.length) tags.push('<span class="tag wait">Role-player waitlist</span>');
     if (c.cancelled) tags.push('<span class="tag closed">Cancelled</span>');
     else if (c.closed) tags.push('<span class="tag closed">Closed</span>');
-    else if (!c.seats.length && !c.waits.length && !rpS.length && !rpW.length) {
+    else if (!need && !c.seats.length && !c.waits.length && !rpS.length && !rpW.length) {
       if (!c.done) tags.push('<span class="tag' + (c.seatsLeft ? ' ok' : ' closed') + '">' + (c.seatsLeft ? c.seatsLeft + (c.seatsLeft === 1 ? ' seat' : ' seats') + ' left' : 'Full: waitlist') + '</span>');
       if (c.rp) tags.push('<span class="tag rp">Role players wanted' + (c.rpLeft ? ': ' + c.rpLeft + ' left' : '') + '</span>');
     }
@@ -868,9 +884,11 @@ var PAGE_VERSION = '2026-11-19l';
     };
     var rows = c.seats.map(function (s) { return row(s, ''); })
       .concat(rpS.map(function (s) { return row(s, 'role player'); }));
-    return '<a class="cls' + (c.seats.length || rpS.length ? ' mine' : '') + '" id="c-cl-' + esc(c.c) + '" href="' + esc(url) + '"><div class="ct"><b>' + esc(c.title) + '</b><span class="chev" aria-hidden="true">›</span></div>' +
+    return '<a class="cls' + (owed.length ? ' part' : c.seats.length || rpS.length ? ' mine' : '') + '" id="c-cl-' + esc(c.c) + '" href="' + esc(url) + '"><div class="ct"><b>' + esc(c.title) + '</b><span class="chev" aria-hidden="true">›</span></div>' +
       '<div class="tags">' + tags.join('') + '</div>' +
       (rows.length ? '<ul class="dts">' + rows.join('') + '</ul>' : '') +
+      (owed.length && !c.closed && !c.cancelled
+        ? '<p class="todo"><b>' + owed.length + (owed.length === 1 ? ' topic' : ' topics') + ' still to pick:</b> ' + esc(owed.join(', ')) + '</p>' : '') +
       (rows.length && !(c.deadline && !c.closed) ? '' :
         '<p class="when">' + (rows.length ? '' : esc([range, c.location].filter(Boolean).join(' · '))) +
           (c.deadline && !c.closed ? (rows.length ? '' : '<br>') + 'Sign up by ' + esc(md(c.deadline)) : '') + '</p>') + '</a>';
