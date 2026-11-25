@@ -22,7 +22,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-25c';
+var PAGE_VERSION = '2026-11-25d';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -331,9 +331,13 @@ var PAGE_VERSION = '2026-11-25c';
      day used to push it below the fold and people lost track of what
      they'd chosen. The list itself scrolls once it gets long, so the
      button is always reachable. */
-  .calbar.stick { position: sticky; bottom: 8px; z-index: 12; box-shadow: 0 10px 26px rgba(19, 33, 58, .18); }
+  .calbar.stick { position: fixed; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom));
+    z-index: 14; margin: 0; box-shadow: 0 10px 30px rgba(19, 33, 58, .22); }
+  /* Both bars at once would sit on top of each other, and this one says
+     strictly more. */
+  body.hascalbar .donebar { display: none !important; }
   .calbar.stick { padding: 12px 13px; }
-  .calbar.stick ul { max-height: 30vh; overflow-y: auto; margin: 7px 0 10px; }
+  .calbar.stick ul { overflow-y: auto; margin: 7px 0 10px; }
   .calbar.stick li { padding: 5px 0; font-size: 14.5px; }
   .calbar.stick li span { font-size: 12.5px; }
   .calbar.stick > b { font-size: 15px; }
@@ -850,6 +854,7 @@ function start() {
     html += '<div class="foot"><span>Updated ' + esc(clock(new Date())) + '</span><button type="button" class="link" id="refresh">Refresh</button></div>';
     app.innerHTML = html;
     drawWho();
+    fitCalBar();
   }
 
   // Every topic on its own line, ticked once they have a date for it.
@@ -958,6 +963,25 @@ function start() {
 
     html += pickBar(closed, 'Tap the days you want, then confirm them together.');
     return html;
+  }
+
+  // The pinned bar floats over the page, so the page needs room under it
+  // or the last rows hide behind it. Measured, because it grows with the
+  // number of dates.
+  function fitCalBar() {
+    var bar = document.querySelector('.calbar.stick');
+    document.body.classList.toggle('hascalbar', !!bar);
+    if (!bar) { app.style.paddingBottom = ''; return; }
+    var h = Math.ceil(bar.getBoundingClientRect().height) + 20;
+    var cap = Math.round(window.innerHeight * 0.62);
+    var list = bar.querySelector('ul');
+    if (list && h > cap) {
+      // Too tall for the screen: let the list scroll instead of pushing
+      // the button off the bottom.
+      list.style.maxHeight = Math.max(80, list.getBoundingClientRect().height - (h - cap)) + 'px';
+      h = Math.ceil(bar.getBoundingClientRect().height) + 20;
+    }
+    app.style.paddingBottom = h + 'px';
   }
 
   // What they've chosen and the one button that does it. Shared by the
