@@ -22,7 +22,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-24e';
+var PAGE_VERSION = '2026-11-25a';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -265,6 +265,9 @@ var PAGE_VERSION = '2026-11-24e';
   .calday.got { background: var(--okbg); color: var(--ok); }
   .calday.got i { color: var(--ok); }
   .calday.sel { outline: 2.5px solid var(--navy); outline-offset: -2.5px; }
+  /* Nothing left to take that day. Still tappable, so you can see who is on it. */
+  .calday.full { background: #F6D7D5; color: #8E1F1A; }
+  .calday.full i { color: #B3261E; font-size: 9px; letter-spacing: -.03em; }
   /* ---- The grid: topics down the side, weeks across the top ---- */
   .gwrap { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 10px 10px 0;
     overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -895,15 +898,24 @@ function start() {
       if (!list) { html += '<span class="calday">' + n + '</span>'; continue; }
       var picked = list.some(function (d) { return calPick[d.id]; });
       var sq = showSquads() ? squadOff(key) : '';
-      var mark = picked || mineDays[key] ? '\u2713' : sq ? sq + '-off' : list.length > 1 ? list.length : '\u00b7';
-      html += '<button type="button" data-calday="' + key + '" aria-pressed="' + picked + '" aria-label="' + esc(day(key)) + '"' +
-        ' class="calday has' + (mineDays[key] ? ' got' : '') + (picked ? ' pick' : '') + (calDay === key ? ' sel' : '') + '">' +
+      // Nothing left to take on this day: same test the rest of the page
+      // uses. A day you're already on, or have picked, is never "full".
+      var anyOpen = list.some(function (d) {
+        return !d.shut && d.seats - d['in'].length > 0 && !d.started && d.date >= st.today;
+      });
+      var fullDay = !anyOpen && !mineDays[key] && !picked;
+      var mark = picked || mineDays[key] ? '\u2713' : fullDay ? 'Full' : sq ? sq + '-off' : list.length > 1 ? list.length : '\u00b7';
+      html += '<button type="button" data-calday="' + key + '" aria-pressed="' + picked + '"' +
+        ' aria-label="' + esc(day(key)) + (fullDay ? ', full' : '') + '"' +
+        ' class="calday has' + (mineDays[key] ? ' got' : '') + (picked ? ' pick' : '') +
+        (fullDay ? ' full' : '') + (calDay === key ? ' sel' : '') + '">' +
         n + '<i>' + mark + '</i></button>';
     }
     html += '</div><div class="callegend">' +
       '<span><b style="background:#E6EBF3"></b>Has a class</span>' +
       '<span><b style="background:var(--ok)"></b>Booked</span>' +
       '<span><b style="background:var(--navy)"></b>Picked</span>' +
+      '<span><b style="background:#F6D7D5"></b>Full</span>' +
       (showSquads() ? '<span>A-off / B-off \u2014 the squad that\'s off</span>' : '') + '</div></div>';
 
     // The day you tapped opens underneath: what's on it, who has already
