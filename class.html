@@ -22,7 +22,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-25a';
+var PAGE_VERSION = '2026-11-25b';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -327,6 +327,17 @@ var PAGE_VERSION = '2026-11-25a';
   .calpickrow.mine em { color: var(--ok); }
   .calwho { color: var(--navy) !important; font-weight: 600 !important; }
   .calbar { background: var(--card); border: 1.5px solid var(--navy); border-radius: 16px; padding: 14px; margin: 0 0 14px; }
+  /* While there are picks, it rides the bottom of the screen: tapping a
+     day used to push it below the fold and people lost track of what
+     they'd chosen. The list itself scrolls once it gets long, so the
+     button is always reachable. */
+  .calbar.stick { position: sticky; bottom: 8px; z-index: 12; box-shadow: 0 10px 26px rgba(19, 33, 58, .18); }
+  .calbar.stick { padding: 12px 13px; }
+  .calbar.stick ul { max-height: 30vh; overflow-y: auto; margin: 7px 0 10px; }
+  .calbar.stick li { padding: 5px 0; font-size: 14.5px; }
+  .calbar.stick li span { font-size: 12.5px; }
+  .calbar.stick > b { font-size: 15px; }
+  .calbar.stick .link { margin-top: 4px; padding: 5px; font-size: 14px; }
   .calbar > b { display: block; font-size: 16px; color: var(--navy); }
   .calbar ul { list-style: none; margin: 10px 0 12px; padding: 0; }
   .calbar li { padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
@@ -950,11 +961,13 @@ function start() {
     var picks = Object.keys(calPick).map(function (id) { return byId[id]; }).filter(Boolean)
       .sort(function (a, b) { return a.date.localeCompare(b.date); });
     if (!picks.length) return closed ? '' : '<p class="note">' + esc(hint) + '</p>';
-    return '<div class="calbar"><b>' + picks.length + (picks.length === 1 ? ' date picked' : ' dates picked') +
+    return '<div class="calbar stick"><b>' + picks.length + (picks.length === 1 ? ' date picked' : ' dates picked') +
       (closed ? '' : ' \u2014 not signed up yet') + '</b><ul>' +
       picks.map(function (d) {
         var was = isIS() ? myStatus(d.topic).seat : myStatus('').seat;
-        return '<li>' + (isIS() ? '<span>' + esc(d.topic) + '</span>' : '') + esc(day(d.date)) +
+        // No year: it's this season, and the bar is short on room.
+        return '<li>' + (isIS() ? '<span>' + esc(d.topic) + '</span>' : '') +
+          esc(day(d.date).replace(/\/\d{4}/, '')) + (times(d) ? ' \u00b7 ' + esc(times(d)) : '') +
           (was && was !== d ? ' <small>replaces ' + esc(shortDay(was.date)) + '</small>' : '') + '</li>';
       }).join('') + '</ul>' +
       (closed ? '<p class="note">' + esc(closed) + '</p>'
