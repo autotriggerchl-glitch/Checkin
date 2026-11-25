@@ -22,7 +22,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-25e';
+var PAGE_VERSION = '2026-11-25f';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -331,6 +331,12 @@ var PAGE_VERSION = '2026-11-25e';
   .calbar ul { list-style: none; margin: 10px 0 12px; padding: 0; }
   .calbar li { padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
   .calbar li span { display: block; font-size: 13px; color: var(--muted); font-weight: 700; }
+  .calbar li { display: flex; align-items: flex-start; gap: 8px; }
+  .calbar li > i { flex: none; width: 13px; font-style: normal; font-weight: 800; line-height: 1.5; }
+  .calbar li > div { flex: 1; min-width: 0; }
+  .calbar li.done > i { color: var(--ok); }
+  .calbar li.new > i { color: var(--navy); }
+  .calbar li.swap, .calbar li.swap span { color: var(--muted); }
   .calbar li small { color: var(--wait); font-weight: 700; }
   .calbar .link { display: block; width: 100%; margin-top: 8px; padding: 8px; border: 0; background: none;
     color: var(--muted); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
@@ -949,17 +955,38 @@ function start() {
     st.cls.dates.forEach(function (d) { byId[d.id] = d; });
     var picks = Object.keys(calPick).map(function (id) { return byId[id]; }).filter(Boolean)
       .sort(function (a, b) { return a.date.localeCompare(b.date); });
-    if (!picks.length) return closed ? '' : '<p class="note">' + esc(hint) + '</p>';
-    return '<div class="calbar"><b>' + picks.length + (picks.length === 1 ? ' date picked' : ' dates picked') +
-      (closed ? '' : ' \u2014 not signed up yet') + '</b><ul>' +
-      picks.map(function (d) {
-        var was = isIS() ? myStatus(d.topic).seat : myStatus('').seat;
-        return '<li>' + (isIS() ? '<span>' + esc(d.topic) + '</span>' : '') + esc(day(d.date)) +
-          (was && was !== d ? ' <small>replaces ' + esc(shortDay(was.date)) + '</small>' : '') + '</li>';
-      }).join('') + '</ul>' +
-      (closed ? '<p class="note">' + esc(closed) + '</p>'
+    // The dates they already hold, listed whether or not they've picked
+    // anything, so opening the calendar shows where they stand.
+    var booked = st.me ? st.cls.dates.filter(function (d) { return d['in'].some(isMe); })
+      .sort(function (a, b) { return a.date.localeCompare(b.date); }) : [];
+    if (!picks.length && !booked.length) return closed ? '' : '<p class="note">' + esc(hint) + '</p>';
+
+    // Picking another date for a topic they already hold replaces it, so
+    // the booked row says so instead of listing the topic twice.
+    var pickedTopic = {};
+    picks.forEach(function (d) { pickedTopic[isIS() ? d.topic : ''] = true; });
+
+    var head = booked.length && picks.length ? booked.length + ' signed up \u00b7 ' + picks.length + ' picked'
+      : picks.length ? picks.length + (picks.length === 1 ? ' date picked' : ' dates picked') + (closed ? '' : ' \u2014 not signed up yet')
+      : booked.length + (booked.length === 1 ? ' date signed up' : ' dates signed up');
+
+    var rows = booked.map(function (d) {
+      var gone = pickedTopic[isIS() ? d.topic : ''];
+      return '<li class="done' + (gone ? ' swap' : '') + '"><i aria-hidden="true">\u2713</i><div>' +
+        (isIS() ? '<span>' + esc(d.topic) + '</span>' : '') + esc(day(d.date)) +
+        (gone ? ' <small>being changed</small>' : '') + '</div></li>';
+    }).concat(picks.map(function (d) {
+      var was = isIS() ? myStatus(d.topic).seat : myStatus('').seat;
+      return '<li class="new"><i aria-hidden="true">\u2022</i><div>' +
+        (isIS() ? '<span>' + esc(d.topic) + '</span>' : '') + esc(day(d.date)) +
+        (was && was !== d ? ' <small>replaces ' + esc(shortDay(was.date)) + '</small>' : '') + '</div></li>';
+    })).join('');
+
+    return '<div class="calbar"><b>' + head + '</b><ul>' + rows + '</ul>' +
+      (!picks.length ? ''
+        : closed ? '<p class="note">' + esc(closed) + '</p>'
         : '<button type="button" class="btn" id="calgo">Sign up for ' + (picks.length === 1 ? 'this date' : 'these ' + picks.length + ' dates') + '</button>') +
-      '<button type="button" class="link" id="calclear">Clear</button></div>';
+      (picks.length ? '<button type="button" class="link" id="calclear">Clear picks</button>' : '') + '</div>';
   }
 
   // ---------- The grid ----------
