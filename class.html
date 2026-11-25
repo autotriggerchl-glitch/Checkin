@@ -22,7 +22,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-25d';
+var PAGE_VERSION = '2026-11-25e';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -327,28 +327,6 @@ var PAGE_VERSION = '2026-11-25d';
   .calpickrow.mine em { color: var(--ok); }
   .calwho { color: var(--navy) !important; font-weight: 600 !important; }
   .calbar { background: var(--card); border: 1.5px solid var(--navy); border-radius: 16px; padding: 14px; margin: 0 0 14px; }
-  /* While there are picks, it rides the bottom of the screen: tapping a
-     day used to push it below the fold and people lost track of what
-     they'd chosen. The list itself scrolls once it gets long, so the
-     button is always reachable. */
-  .calbar.stick { position: fixed; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom));
-    z-index: 14; margin: 0; box-shadow: 0 10px 30px rgba(19, 33, 58, .22); }
-  /* Both bars at once would sit on top of each other, and this one says
-     strictly more. */
-  body.hascalbar .donebar { display: none !important; }
-  .calbar.stick { padding: 12px 13px; }
-  .calbar.stick ul { overflow-y: auto; margin: 7px 0 10px; }
-  .calbar.stick li { padding: 5px 0; font-size: 14.5px; }
-  .calbar.stick li span { font-size: 12.5px; }
-  .calbar.stick > b { font-size: 15px; }
-  .calbar.stick .link { margin-top: 4px; padding: 5px; font-size: 14px; }
-  .calbar li { display: flex; align-items: flex-start; gap: 8px; }
-  .calbar li > i { flex: none; font-style: normal; font-weight: 800; width: 13px; line-height: 1.5; }
-  .calbar li > div { flex: 1; min-width: 0; }
-  .calbar li.done > i { color: var(--ok); }
-  .calbar li.new > i { color: var(--navy); }
-  .calbar li.swap { color: var(--muted); }
-  .calbar li.swap span { color: var(--muted); }
   .calbar > b { display: block; font-size: 16px; color: var(--navy); }
   .calbar ul { list-style: none; margin: 10px 0 12px; padding: 0; }
   .calbar li { padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
@@ -854,7 +832,6 @@ function start() {
     html += '<div class="foot"><span>Updated ' + esc(clock(new Date())) + '</span><button type="button" class="link" id="refresh">Refresh</button></div>';
     app.innerHTML = html;
     drawWho();
-    fitCalBar();
   }
 
   // Every topic on its own line, ticked once they have a date for it.
@@ -965,25 +942,6 @@ function start() {
     return html;
   }
 
-  // The pinned bar floats over the page, so the page needs room under it
-  // or the last rows hide behind it. Measured, because it grows with the
-  // number of dates.
-  function fitCalBar() {
-    var bar = document.querySelector('.calbar.stick');
-    document.body.classList.toggle('hascalbar', !!bar);
-    if (!bar) { app.style.paddingBottom = ''; return; }
-    var h = Math.ceil(bar.getBoundingClientRect().height) + 20;
-    var cap = Math.round(window.innerHeight * 0.62);
-    var list = bar.querySelector('ul');
-    if (list && h > cap) {
-      // Too tall for the screen: let the list scroll instead of pushing
-      // the button off the bottom.
-      list.style.maxHeight = Math.max(80, list.getBoundingClientRect().height - (h - cap)) + 'px';
-      h = Math.ceil(bar.getBoundingClientRect().height) + 20;
-    }
-    app.style.paddingBottom = h + 'px';
-  }
-
   // What they've chosen and the one button that does it. Shared by the
   // calendar and the grid, so picking works the same way in both.
   function pickBar(closed, hint) {
@@ -991,43 +949,17 @@ function start() {
     st.cls.dates.forEach(function (d) { byId[d.id] = d; });
     var picks = Object.keys(calPick).map(function (id) { return byId[id]; }).filter(Boolean)
       .sort(function (a, b) { return a.date.localeCompare(b.date); });
-    // What they already hold, so the bar is useful before they've picked
-    // anything - the point is to see where you stand without hunting.
-    var booked = st.me ? st.cls.dates.filter(function (d) { return d['in'].some(isMe); })
-      .sort(function (a, b) { return a.date.localeCompare(b.date); }) : [];
-    if (!picks.length && !booked.length) return closed ? '' : '<p class="note">' + esc(hint) + '</p>';
-
-    // A pick for a topic they already hold replaces it, so say so on the
-    // booked row rather than listing the same topic twice as if both stood.
-    var pickedTopic = {};
-    picks.forEach(function (d) { pickedTopic[isIS() ? d.topic : ''] = d; });
-
-    var when = function (d) {
-      return esc(day(d.date).replace(/\/\d{4}/, '')) + (times(d) ? ' \u00b7 ' + esc(times(d)) : '');
-    };
-    var head = booked.length && picks.length
-        ? booked.length + ' signed up \u00b7 ' + picks.length + ' picked'
-      : picks.length ? picks.length + (picks.length === 1 ? ' date picked' : ' dates picked') + (closed ? '' : ' \u2014 not signed up yet')
-      : booked.length + (booked.length === 1 ? ' date signed up' : ' dates signed up');
-
-    var rows = booked.map(function (d) {
-      var gone = pickedTopic[isIS() ? d.topic : ''];
-      return '<li class="done' + (gone ? ' swap' : '') + '">' +
-        '<i aria-hidden="true">\u2713</i><div>' +
-        (isIS() ? '<span>' + esc(d.topic) + '</span>' : '') + when(d) +
-        (gone ? ' <small>being changed</small>' : '') + '</div></li>';
-    }).concat(picks.map(function (d) {
-      var was = isIS() ? myStatus(d.topic).seat : myStatus('').seat;
-      return '<li class="new"><i aria-hidden="true">\u2022</i><div>' +
-        (isIS() ? '<span>' + esc(d.topic) + '</span>' : '') + when(d) +
-        (was && was !== d ? ' <small>replaces ' + esc(shortDay(was.date)) + '</small>' : '') + '</div></li>';
-    })).join('');
-
-    return '<div class="calbar stick"><b>' + head + '</b><ul>' + rows + '</ul>' +
-      (!picks.length ? ''
-        : closed ? '<p class="note">' + esc(closed) + '</p>'
+    if (!picks.length) return closed ? '' : '<p class="note">' + esc(hint) + '</p>';
+    return '<div class="calbar"><b>' + picks.length + (picks.length === 1 ? ' date picked' : ' dates picked') +
+      (closed ? '' : ' \u2014 not signed up yet') + '</b><ul>' +
+      picks.map(function (d) {
+        var was = isIS() ? myStatus(d.topic).seat : myStatus('').seat;
+        return '<li>' + (isIS() ? '<span>' + esc(d.topic) + '</span>' : '') + esc(day(d.date)) +
+          (was && was !== d ? ' <small>replaces ' + esc(shortDay(was.date)) + '</small>' : '') + '</li>';
+      }).join('') + '</ul>' +
+      (closed ? '<p class="note">' + esc(closed) + '</p>'
         : '<button type="button" class="btn" id="calgo">Sign up for ' + (picks.length === 1 ? 'this date' : 'these ' + picks.length + ' dates') + '</button>') +
-      (picks.length ? '<button type="button" class="link" id="calclear">Clear picks</button>' : '') + '</div>';
+      '<button type="button" class="link" id="calclear">Clear</button></div>';
   }
 
   // ---------- The grid ----------
