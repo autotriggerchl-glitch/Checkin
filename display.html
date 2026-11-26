@@ -26,7 +26,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-18a';
+var PAGE_VERSION = '2026-11-25g';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -599,7 +599,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-11-03a';
+  var PAGE_VERSION = '2026-11-25g';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -925,7 +925,8 @@ var LOCK = (function () {
 
   function tileHtml(t, bi, ti) {
     var titles = { onduty: "Who's working", staffing: 'Staffing', off: 'Off today', cruisers: 'Cruisers', training: 'Upcoming training',
-      overlaps: 'Overlaps to review', message: 'Notice', clock: '', feed: 'Latest changes', ready: 'Training readiness', oncall: 'On call', court: 'Court', holdover: 'Holdover list', events: 'Calendar', divwork: 'Divisions at work', tasks: 'Tasks' };
+      overlaps: 'Overlaps to review', message: 'Notice', clock: '', feed: 'Latest changes', ready: 'Training readiness', oncall: 'On call', court: 'Court', holdover: 'Holdover list', events: 'Calendar', divwork: 'Divisions at work', tasks: 'Tasks',
+      insvc: 'In-Service still to pick' };
     var title = t.title || (t.type === 'events' && t.calName) || titles[t.type] || '';
     var sub = t.squad && /^(onduty|staffing|off|holdover)$/.test(t.type) ? t.squad : '';
     var inner = '', o = t.o || {};
@@ -1006,6 +1007,31 @@ var LOCK = (function () {
         return '<div class="fd' + (isNew(bi, ti, JSON.stringify(x)) ? ' chg' : '') + '"><span class="t">' + esc(x.t) + '</span><div class="x"><b>' + esc(who) + '</b>' +
           '<div class="sub">' + esc(x.f) + (what ? ': ' : '') + what + (x.sh && o.shift !== 'no' ? ' · ' + esc(SHIFT_NAMES[x.sh] || x.sh) : '') + '</div></div></div>';
       }).join('') : '<p class="empty">No changes in the last ' + (t.hours || 12) + ' hours.</p>';
+    } else if (t.type === 'insvc') {
+      inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' :
+        (t.classes || []).map(function (c) {
+          var sw = list(o, 'show', ['count', 'names', 'left']);
+          var pct = c.total ? Math.round(c.done / c.total * 100) : 0;
+          // The deadline is the whole point of the panel, so it leads.
+          var due = c.days == null ? '' : c.days < 0 ? 'sign-ups closed' :
+            c.days === 0 ? 'last day to pick' :
+            c.days === 1 ? '1 day left' : c.days + ' days left';
+          var urge = c.days != null && c.days <= 7 ? ' bad' : '';
+          var head = '<div class="rd-top"><span class="big' + (c.left ? urge || ' bad' : '') + '" style="font-size:2.6em">' + (c.left || 0) + '</span>' +
+            '<span class="sub">' + (c.left === 1 ? 'person still has' : 'people still have') + ' an In-Service date to pick' +
+            (due ? ' &middot; <b>' + esc(due) + '</b>' : '') + '</span></div>';
+          var bar = sw.indexOf('count') >= 0
+            ? '<div class="rd"><div class="h"><span>' + esc(c.title) + '</span><span>' + c.done + '/' + c.total + ' done &middot; ' + pct + '%</span></div>' +
+              '<div class="bar ' + (pct < 70 ? 'low' : pct < 90 ? 'mid' : '') + '"><i style="width:' + pct + '%"></i></div></div>'
+            : '';
+          var names = (c.rows && c.rows.length)
+            ? '<div class="ppl miss">' + c.rows.map(function (p) {
+                return '<span class="chip never">' + (p.c ? '<i>' + esc(p.c) + '</i>' : '') + esc(p.n) +
+                  (p.left ? ' <small>' + esc(p.left) + '</small>' : '') + '</span>'; }).join('') +
+              (c.more ? '<span class="chip">+' + c.more + ' more</span>' : '') + '</div>'
+            : '';
+          return head + bar + names;
+        }).join('');
     } else if (t.type === 'ready') {
       inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' :
         '<div class="rd-top"><span class="big' + (t.missing ? ' bad' : '') + '" style="font-size:2.6em">' + (t.missing || 0) + '</span><span class="sub">of ' + (t.people || 0) + ' people are missing a required training</span></div>' +
