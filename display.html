@@ -26,7 +26,7 @@
 // PAGE_VERSION must change whenever the page changes, or nothing here
 // fires. Bump it in the same edit.
 // ---------------------------------------------------------------------
-var PAGE_VERSION = '2026-11-25h';
+var PAGE_VERSION = '2026-11-25i';
 (function () {
   var checking = false, last = 0, found = '';
   function bar(v) {
@@ -599,7 +599,7 @@ var LOCK = (function () {
   var DEPT = 'Chelsea Police Department', PATCH = 'https://i.imgur.com/Yu7RJhS.png';
   var LAT = 42.3918, LON = -71.0328; // Chelsea, for the weather
   var POLL = 15000;
-  var PAGE_VERSION = '2026-11-25h';
+  var PAGE_VERSION = '2026-11-25i';
   var q = new URLSearchParams(location.search);
   var id = q.get('d') || '';
   var app = document.getElementById('app'), status = document.getElementById('status');
@@ -1019,9 +1019,13 @@ var LOCK = (function () {
           // Lead with the job the board was set up to watch: registering
           // people in Acadis if that list is on, otherwise sign-ups.
           var ls = t.lists || ['pick', 'reg'];
+          // A Duty Roster older than this page sends no Acadis numbers at
+          // all. Missing is not the same as none, and a confident "0 to
+          // register" on the wall is worse than saying nothing.
+          var hasAc = c.regN != null;
           var big, cap;
-          if (ls.indexOf('reg') >= 0) {
-            big = c.regN || 0;
+          if (ls.indexOf('reg') >= 0 && hasAc) {
+            big = c.regN;
             cap = (big === 1 ? 'person needs' : 'people need') + ' registering in Acadis';
           } else {
             big = c.left || 0;
@@ -1052,9 +1056,11 @@ var LOCK = (function () {
                   '</span>'; }).join('') +
               (more ? '<span class="chip">+' + more + ' more</span>' : '') + '</div></div>';
           };
+          var waiting = (ls.indexOf('reg') >= 0 || ls.indexOf('unreg') >= 0) && !hasAc
+            ? '<p class="empty">The Acadis lists need the newer Duty Roster deployed.</p>' : '';
           return head + bar + names +
             job(c.reg, c.regN, c.regMore, 'To register in Acadis', 'never') +
-            job(c.unreg, c.unregN, c.unregMore, 'To take out of Acadis', '');
+            job(c.unreg, c.unregN, c.unregMore, 'To take out of Acadis', '') + waiting;
         }).join('');
     } else if (t.type === 'ready') {
       inner = t.empty ? '<p class="empty">' + esc(t.empty) + '</p>' :
